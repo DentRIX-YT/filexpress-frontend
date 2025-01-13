@@ -1,0 +1,162 @@
+/* General Styling */
+body, .login-page {
+    direction: ltr;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.login-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #ffffff;
+    animation: fadeIn 1s ease-in-out; /* Page fade-in */
+    overflow: hidden;
+}
+
+/* Login content styling */
+.login-content {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    padding: 20px;
+    background-color: #f7f7f7;
+    border-radius: 16px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    animation: popUp 1s ease-in-out; /* Cube pop-up effect */
+    transition: all 0.8s ease-in-out;
+}
+
+/* Dissolve the cube in sign-up mode */
+.login-content.sign-up-mode {
+    background-color: transparent;
+    box-shadow: none;
+}
+
+/* Form Container Styling */
+.form-container {
+    text-align: center;
+    opacity: 1;
+    transition: opacity 0.8s ease-in-out;
+}
+
+.login-content.sign-up-mode .form-container {
+    opacity: 0;
+}
+
+/* Signup Form Styling */
+.signup-form {
+    position: absolute;
+    top: 50%;
+    left: 5%;
+    transform: translateY(-50%); /* Center vertically */
+    width: 90%; /* Take most of the width */
+    text-align: left;
+    animation: slideIn 0.8s ease-in-out forwards; /* Slide in from the left */
+}
+
+/* Keyframes for signup form animation */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20%) translateY(-50%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) translateY(-50%);
+    }
+}
+
+/* Logo Styling */
+.logo-container {
+    margin-bottom: 20px;
+}
+
+.login-logo {
+    width: 200px;
+    height: auto;
+}
+
+/* Large Logo Styling for Sign-Up */
+.large-logo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+.large-logo {
+    width: 300px; /* Larger logo size */
+    height: auto;
+}
+
+/* Input Fields Styling */
+.form-group input {
+    width: calc(100% - 10px); /* Slightly smaller to align with the cube edges */
+    padding: 12px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 18px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.3s ease-in-out;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #DAA520;
+}
+
+/* Button Styling */
+.login-button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background-color: #DAA520;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease-in-out;
+}
+
+.login-button:hover {
+    background-color: #B8860B;
+}
+
+/* Toggle Link */
+.toggle-link {
+    color: #DAA520;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s ease-in-out;
+}
+
+.toggle-link:hover {
+    color: #B8860B;
+}
+
+/* Keyframes for page fade-in */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+/* Keyframes for cube pop-up */
+@keyframes popUp {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}

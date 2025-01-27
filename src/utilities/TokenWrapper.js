@@ -7,8 +7,8 @@ const TokenWrapper = ({ children }) => {
 
   useEffect(() => {
     const checkTokens = async () => {
-      const accessToken = sessionStorage.getItem("accessToken");
-      const refreshToken = sessionStorage.getItem("refreshToken");
+      const currentAccessToken = sessionStorage.getItem("accessToken");
+      const currentRefreshToken = sessionStorage.getItem("refreshToken");
 
       const isTokenExpired = (token) => {
         if (!token) return true;
@@ -22,31 +22,26 @@ const TokenWrapper = ({ children }) => {
         }
       };
 
-      if (isTokenExpired(accessToken)) {
-        if (refreshToken && !isTokenExpired(refreshToken)) {
+      if (isTokenExpired(currentAccessToken)) {
+        if (currentRefreshToken && !isTokenExpired(currentRefreshToken)) {
           try {
             const response = await fetch("http://localhost:8080/refresh_token", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ token: refreshToken }),
+              body: JSON.stringify({ token: currentRefreshToken }),
             });
 
             if (response.ok) {
-              const { newAccessToken, newRefreshToken, role } = await response.json();
+              const { accessToken, refreshToken, privateKeyExists, roles } = await response.json();
 
-              // Store updated tokens
-              sessionStorage.setItem("accessToken", newAccessToken);
-              sessionStorage.setItem("refreshToken", newRefreshToken);
-              sessionStorage.setItem("userRole", role);
+              // Store updated tokens using the correct keys from the response
+              sessionStorage.setItem("accessToken", accessToken);
+              sessionStorage.setItem("refreshToken", refreshToken);
+              sessionStorage.setItem("data.privateKeyExists", privateKeyExists);
+              sessionStorage.setItem("userRole", JSON.stringify(roles));
 
-              // Navigate based on user role
-              if (role === "ROLE_ADMIN") {
-                navigate("/admin/users");
-              } else {
-                navigate("/home");
-              }
             } else {
               // Clear session and redirect to login if refresh fails
               sessionStorage.clear();

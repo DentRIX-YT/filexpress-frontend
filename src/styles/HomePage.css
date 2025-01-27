@@ -1,78 +1,193 @@
 /* General Styling */
 body, .home-page {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.home-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #f7f7f7, #dae1e7, #e7f7ff);
+  background-size: 200% 200%;
+  animation: backgroundShift 8s infinite alternate ease-in-out;
+}
+
+/* Navigation Bar */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 20px 30px;
+  background-color: #333;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  animation: slideDown 1.2s ease-in-out;
+}
+
+.nav-logo {
+  height: 50px;
+  cursor: pointer;
+  margin-left: 20px;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin-right: 20px;
+}
+
+.nav-links button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+.nav-links button:hover {
+  color: #daa520;
+  transform: scale(1.1);
+}
+
+/* Profile Dropdown */
+.nav-profile {
+  position: relative;
+  font-size: 1.2rem;
+}
+
+.profile-name {
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform 0.3s ease-in-out;
+}
+
+.profile-name:hover {
+  transform: scale(1.1);
+}
+
+.profile-dropdown {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  background-color: white;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 10;
+  animation: dropdownFadeIn 0.3s ease-in-out;
+  padding: 0;
+}
+
+.profile-dropdown button {
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: #333;
+  text-align: middle;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+.profile-dropdown button + button {
+  border-top: 1px solid #ddd;
+}
+
+.profile-dropdown button:hover {
+  background-color: #f7f7f7;
+  color: #daa520;
+}
+
+/* About Section */
+.home-content {
+  text-align: center;
+  padding: 30px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 700px;
+  margin-top: 40px;
+  animation: fadeInUp 1s ease-in-out;
+}
+
+.home-content h1 {
+  font-size: 3rem;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.about-details p {
+  font-size: 1.3rem;
+  color: #555;
+  line-height: 1.4;
+  margin-bottom: 20px;
+}
+
+.features-list {
+  text-align: left;
+  margin: 0 auto 20px;
+  padding: 0;
+  list-style: none;
+  max-width: 600px;
+}
+
+.features-list li {
+  margin-bottom: 15px;
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+
+.features-list strong {
+  color: #333;
+}
+
+/* Keyframes for Animations */
+@keyframes dropdownFadeIn {
+  from {
+    transform: translateY(-10%);
+    opacity: 0;
   }
-  
-  .home-page {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    background: linear-gradient(135deg, #f7f7f7, #dae1e7);
-    animation: fadeIn 1.5s ease-in-out; /* Smooth fade-in */
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
-  
-  /* Home Content Styling */
-  .home-content {
-    text-align: center;
-    padding: 20px;
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-    width: 90%;
-    max-width: 400px;
-    animation: slideUp 1.2s ease-in-out; /* Slide-up animation */
+}
+
+@keyframes backgroundShift {
+  0% {
+    background-position: 0% 50%;
   }
-  
-  .home-content h1 {
-    font-size: 2.5rem;
-    color: #333;
-    margin-bottom: 20px;
+  100% {
+    background-position: 100% 50%;
   }
-  
-  .home-content p {
-    font-size: 1.2rem;
-    color: #555;
-    margin-bottom: 30px;
-    line-height: 1.5;
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(30%);
+    opacity: 0;
   }
-  
-  /* Keyframes for Animations */
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
-  
-  @keyframes slideUp {
-    from {
-      transform: translateY(30%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
   }
-  
-  /* Logout Button Styling (reuses the button styles) */
-  .logout-button {
-    padding: 12px 24px;
-    background-color: #daa520;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: bold;
-    cursor: pointer;
-    transition: background-color 0.3s ease-in-out;
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
-  
-  .logout-button:hover {
-    background-color: #b8860b;
-  }
+}

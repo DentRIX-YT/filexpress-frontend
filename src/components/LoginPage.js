@@ -1,10 +1,14 @@
 import React, { useState } from "react";
+import CryptoJS from "crypto-js";
 import { useNavigate } from "react-router-dom";
 import "../styles/LoginPage.css";
+import PassphraseSetup from "./PassphraseSetup";
 
 const LoginPage = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState(null);
+
+  const [isNewUser, setIsNewUser] = useState(false);
 
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -34,12 +38,18 @@ const LoginPage = () => {
       sessionStorage.setItem("accessToken", data.accessToken);
       sessionStorage.setItem("refreshToken", data.refreshToken);
       sessionStorage.setItem("userRole", data.roles);
+      sessionStorage.setItem("data.privateKeyExists", data.privateKeyExists);
 
-      // Clear the login input fields
-      setLoginUsername("");
-      setLoginPassword("");
+      if (data.privateKeyExists === false) {
+        setIsNewUser(true);
+        sessionStorage.setItem("isNewUser", isNewUser); // Backend should provide this info
+      } else {
+        // Clear the login input fields
+        setLoginUsername("");
+        setLoginPassword("");
 
-      navigate("/home");
+        navigate("/home");
+      }
     } catch (err) {
       setError("Login failed. Please check your username and password.");
     }
@@ -80,122 +90,181 @@ const LoginPage = () => {
       setSignUpDOB("");
 
       setIsSignUp(false);
-      navigate("/home");
     } catch (err) {
       setError("Sign up failed. Please try again.");
     }
   };
 
+  const handlePassphraseSubmit = async (passphrase) => {
+    try {
+      // 1. Generate RSA Key Pair
+      const keyPair = await window.crypto.subtle.generateKey(
+        {
+          name: "RSA-OAEP",
+          modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]),
+          hash: "SHA-256",
+        },
+        true, // extractable keys
+        ["encrypt", "decrypt"]
+      );
+  
+      // 2. Export Keys
+      const publicKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
+      const privateKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
+  
+      // 3. Convert to Base64 Strings
+      const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKey)));
+      const privateKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(privateKey)));
+  
+      // 4. Encrypt the Private Key with the Passphrase
+      const encryptedKey = CryptoJS.AES.encrypt(privateKeyBase64, passphrase).toString();
+  
+      // 5. Save Public Key to Backend
+      await fetch("http://localhost:8080/api/public-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: loginUsername,
+          publicKeyValue: publicKeyBase64,
+        }),
+      });
+  
+      // 6. Save Encrypted Private Key to Backend
+      await fetch("http://localhost:8080/api/private-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: loginUsername,
+          encryptedPrivateKey: encryptedKey,
+        }),
+      });
+  
+      // 7. Mark User as Not New and Navigate to Home
+      setIsNewUser(false);
+      navigate("/home");
+    } catch (error) {
+      console.error("Error generating or saving keys:", error);
+      alert("An error occurred while setting up your keys. Please try again.");
+    }
+  };
+
   return (
-    <div className="login-page">
-      <div className={`login-content ${isSignUp ? "sign-up-mode" : ""}`}>
-        <div className="form-container login-form">
-          <div className="logo-container">
-            <img
-              src="/logo-no-background.png"
-              alt="FileXpress Logo"
-              className="login-logo"
-            />
-          </div>
-          <h2>Welcome Back</h2>
-          {error && !isSignUp && <p style={{ color: "red" }}>{error}</p>}
-          <form onSubmit={handleLogin}>
-            <div className="form-group">
-              <input
-                type="text"
-                placeholder="Username"
-                value={loginUsername}
-                onChange={(e) => setLoginUsername(e.target.value)}
-              />
-            </div>
-            <div className="form-group">
-              <input
-                type="password"
-                placeholder="Password"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-              />
-            </div>
-            <button type="submit" className="login-button">
-              Login
-            </button>
-            <p>
-              Don't have an account?{" "}
-              <span
-                className="toggle-link"
-                onClick={() => {
-                  setError(null);
-                  setIsSignUp(true);
-                }}
-              >
-                Sign Up
-              </span>
-            </p>
-          </form>
-        </div>
-        {isSignUp && (
-          <div className="signup-form">
-            <div className="large-logo-container">
-              <img
-                src="/logo-no-background.png"
-                alt="FileXpress Logo"
-                className="large-logo"
-              />
-            </div>
-            <h2>Create Account</h2>
-            {error && isSignUp && <p style={{ color: "red" }}>{error}</p>}
-            <form onSubmit={handleSignUp}>
-              <div className="form-group">
-                <input
-                  type="email"
-                  placeholder="Email"
-                  value={signUpEmail}
-                  onChange={(e) => setSignUpEmail(e.target.value)}
+    <div>
+      {isNewUser ? (
+        <PassphraseSetup onPassphraseSubmit={handlePassphraseSubmit} />
+      ) : (
+        <div className="login-page">
+          <div className={`login-content ${isSignUp ? "sign-up-mode" : ""}`}>
+            <div className="form-container login-form">
+              <div className="logo-container">
+                <img
+                  src="/logo-no-background.png"
+                  alt="FileXpress Logo"
+                  className="login-logo"
                 />
               </div>
-              <div className="form-group">
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={signUpUsername}
-                  onChange={(e) => setSignUpUsername(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={signUpPassword}
-                  onChange={(e) => setSignUpPassword(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <input
-                  type="date"
-                  placeholder="Date of Birth"
-                  value={signUpDOB}
-                  onChange={(e) => setSignUpDOB(e.target.value)}
-                />
-              </div>
-              <button type="submit" className="login-button">
-                Sign Up
-              </button>
-              <p>
-                Already have an account?{" "}
-                <span
-                  className="toggle-link"
-                  onClick={() => {
-                    setError(null);
-                    setIsSignUp(false);
-                  }}
-                >
+              <h2>Welcome Back</h2>
+              {error && !isSignUp && <p style={{ color: "red" }}>{error}</p>}
+              <form onSubmit={handleLogin}>
+                <div className="form-group">
+                  <input
+                    type="text"
+                    placeholder="Username"
+                    value={loginUsername}
+                    onChange={(e) => setLoginUsername(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <input
+                    type="password"
+                    placeholder="Password"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                  />
+                </div>
+                <button type="submit" className="login-button">
                   Login
-                </span>
-              </p>
-            </form>
+                </button>
+                <p>
+                  Don't have an account?{" "}
+                  <span
+                    className="toggle-link"
+                    onClick={() => {
+                      setError(null);
+                      setIsSignUp(true);
+                    }}
+                  >
+                    Sign Up
+                  </span>
+                </p>
+              </form>
+            </div>
+            {isSignUp && (
+              <div className="signup-form">
+                <div className="large-logo-container">
+                  <img
+                    src="/logo-no-background.png"
+                    alt="FileXpress Logo"
+                    className="large-logo"
+                  />
+                </div>
+                <h2>Create Account</h2>
+                {error && isSignUp && <p style={{ color: "red" }}>{error}</p>}
+                <form onSubmit={handleSignUp}>
+                  <div className="form-group">
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={signUpEmail}
+                      onChange={(e) => setSignUpEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      placeholder="Username"
+                      value={signUpUsername}
+                      onChange={(e) => setSignUpUsername(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={signUpPassword}
+                      onChange={(e) => setSignUpPassword(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <input
+                      type="date"
+                      placeholder="Date of Birth"
+                      value={signUpDOB}
+                      onChange={(e) => setSignUpDOB(e.target.value)}
+                    />
+                  </div>
+                  <button type="submit" className="login-button">
+                    Sign Up
+                  </button>
+                  <p>
+                    Already have an account?{" "}
+                    <span
+                      className="toggle-link"
+                      onClick={() => {
+                        setError(null);
+                        setIsSignUp(false);
+                      }}
+                    >
+                      Login
+                    </span>
+                  </p>
+                </form>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

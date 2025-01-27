@@ -1,39 +1,121 @@
-.passphrase-setup {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    width: 400px;
-    margin: auto;
-    text-align: center;
-}
+/* 
+  Use the same gradient, backgroundShift animation,
+  and fadeInUp from your HomePage design
+*/
 
-.passphrase-setup h2 {
-    margin-bottom: 20px;
-}
-
-.form-group input {
+/* Reset + shared box-sizing */
+body, .passphrase-page {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  /* Full-screen container with animated gradient */
+  .passphrase-page {
+    position: relative;
     width: 100%;
-    padding: 10px;
-    margin-bottom: 10px;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  
+    background: linear-gradient(135deg, #f7f7f7, #dae1e7, #e7f7ff);
+    background-size: 200% 200%;
+    animation: backgroundShift 8s infinite alternate ease-in-out;
+  }
+  
+  /* White "card" box in the center, like the home-content style */
+  .passphrase-box {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 400px;
+    padding: 30px;
+    text-align: center;
+    animation: fadeInUp 1s ease-in-out;
+  }
+  
+  .passphrase-logo {
+    max-height: 60px;
+    margin-bottom: 20px;
+  }
+  
+  .passphrase-title {
+    font-size: 2rem;
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  .passphrase-form {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .passphrase-group {
+    margin-bottom: 1.5rem;
+  }
+  
+  .passphrase-input {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
     border: 1px solid #ddd;
-    border-radius: 5px;
-}
-
-.error-message {
+    border-radius: 8px;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.3s ease-in-out;
+  }
+  
+  .passphrase-input:focus {
+    border-color: #daa520;
+  }
+  
+  .passphrase-error {
+    margin-bottom: 1rem;
     color: red;
-    margin-bottom: 10px;
-}
-
-.submit-button {
-    background-color: #daa520;
-    color: white;
-    padding: 10px 20px;
+    font-weight: bold;
+    font-size: 0.9rem;
+  }
+  
+  .passphrase-button {
+    background-color: #333;
+    color: #fff;
     border: none;
-    border-radius: 5px;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
     cursor: pointer;
-}
-
-.submit-button:hover {
-    background-color: #b8860b;
-}
+    font-weight: 600;
+    transition: transform 0.3s ease-in-out, background-color 0.3s ease-in-out;
+  }
+  
+  .passphrase-button:hover {
+    transform: scale(1.05);
+    background-color: #daa520;
+    color: #333;
+  }
+  
+  /* 
+    Keyframes reused from your HomePage
+  */
+  @keyframes backgroundShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      transform: translateY(30%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }

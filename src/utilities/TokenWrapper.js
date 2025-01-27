@@ -1,9 +1,10 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 
 const TokenWrapper = ({ children }) => {
   const navigate = useNavigate();
+  const [isTokenChecked, setIsTokenChecked] = useState(false); // Tracks if token validation is complete
 
   useEffect(() => {
     const checkTokens = async () => {
@@ -23,6 +24,7 @@ const TokenWrapper = ({ children }) => {
       };
 
       if (isTokenExpired(currentAccessToken)) {
+        console.log("Access token expired. Attempting refresh...");
         if (currentRefreshToken && !isTokenExpired(currentRefreshToken)) {
           try {
             const response = await fetch("http://localhost:8080/refresh_token", {
@@ -30,38 +32,44 @@ const TokenWrapper = ({ children }) => {
               headers: {
                 "Content-Type": "application/json",
               },
-              body: JSON.stringify({ token: currentRefreshToken }),
+              body: JSON.stringify({ refreshToken: currentRefreshToken }),
             });
 
             if (response.ok) {
               const { accessToken, refreshToken, privateKeyExists, roles } = await response.json();
+              console.log("Tokens refreshed successfully");
 
-              // Store updated tokens using the correct keys from the response
+              // Store updated tokens
               sessionStorage.setItem("accessToken", accessToken);
               sessionStorage.setItem("refreshToken", refreshToken);
               sessionStorage.setItem("data.privateKeyExists", privateKeyExists);
               sessionStorage.setItem("userRole", JSON.stringify(roles));
-
             } else {
-              // Clear session and redirect to login if refresh fails
+              console.error("Failed to refresh tokens:", response.status);
               sessionStorage.clear();
               navigate("/login");
             }
           } catch (error) {
-            console.error("Token refresh failed:", error);
+            console.error("Error during token refresh:", error);
             sessionStorage.clear();
             navigate("/login");
           }
         } else {
-          // If refresh token is also expired, clear session and redirect to login
+          console.error("Refresh token expired or missing. Redirecting to login.");
           sessionStorage.clear();
           navigate("/login");
         }
       }
+      setIsTokenChecked(true); // Mark token check as complete
     };
 
     checkTokens();
   }, [navigate]);
+
+  if (!isTokenChecked) {
+    // Render a loading state while tokens are being validated or refreshed
+    return <div>Loading...</div>;
+  }
 
   return <>{children}</>;
 };

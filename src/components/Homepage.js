@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../styles/HomePage.css";
 import LogoutButton from "./LogoutButton";
 import TokenWrapper from "../utilities/TokenWrapper";
@@ -7,6 +7,47 @@ import { useNavigate } from "react-router-dom";
 const HomePage = () => {
   const navigate = useNavigate();
   const [isProfileDropdownVisible, setProfileDropdownVisible] = useState(false);
+  const [username, setUsername] = useState("Loading..."); // Placeholder for username
+
+  useEffect(() => {
+    const fetchUsername = async () => {
+      const accessToken = sessionStorage.getItem("accessToken"); // Get access token from session storage
+      if (!accessToken) {
+        console.error("Access token is missing. Redirecting to login.");
+        navigate("/login");
+        return;
+      }
+
+      try {
+        const response = await fetch("http://localhost:8080/users/me", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`, // Pass the token in the Authorization header
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUsername(data.username); // Update the username state
+        } else {
+          console.error("Failed to fetch username. Redirecting to login.");
+          navigate("/login");
+        }
+      } catch (error) {
+        console.error("Error while fetching username:", error);
+        navigate("/login");
+      }
+    };
+
+    // Delay the fetchUsername call by 100ms
+    const timer = setTimeout(() => {
+      fetchUsername();
+    }, 100);
+
+    // Cleanup the timeout if the component unmounts
+    return () => clearTimeout(timer);
+    
+  }, [navigate]);
 
   const toggleProfileDropdown = () => {
     setProfileDropdownVisible((prevState) => !prevState);
@@ -24,11 +65,15 @@ const HomePage = () => {
             onClick={() => navigate("/home")}
           />
           <div className="nav-links">
-            <button onClick={() => navigate("/transfer-files")}>Transfer Files</button>
-            <button onClick={() => navigate("/view-old-files")}>View Old Files</button>
+            <button onClick={() => navigate("/transfer-files")}>
+              Transfer Files
+            </button>
+            <button onClick={() => navigate("/view-old-files")}>
+              View Old Files
+            </button>
             <div className="nav-profile">
               <span onClick={toggleProfileDropdown} className="profile-name">
-                Nadav2005
+                {username} {/* Dynamically display the username */}
               </span>
               {isProfileDropdownVisible && (
                 <div className="profile-dropdown">
@@ -45,24 +90,33 @@ const HomePage = () => {
           <h1>About FileXpress</h1>
           <div className="about-details">
             <p>
-              FileXpress is your secure and user-friendly platform for managing and transferring files. It provides a reliable, seamless, and secure solution tailored for both professional and casual users.
+              FileXpress is your secure and user-friendly platform for managing
+              and transferring files. It provides a reliable, seamless, and
+              secure solution tailored for both professional and casual users.
             </p>
             <ul className="features-list">
               <li>
-                <strong>Secure Transfers:</strong> Your files are encrypted during transfer and storage, ensuring complete privacy and protection.
+                <strong>Secure Transfers:</strong> Your files are encrypted
+                during transfer and storage, ensuring complete privacy and
+                protection.
               </li>
               <li>
-                <strong>Robust Storage:</strong> Easily access your files anytime with scalable and reliable storage options.
+                <strong>Robust Storage:</strong> Easily access your files
+                anytime with scalable and reliable storage options.
               </li>
               <li>
-                <strong>Easy Collaboration:</strong> Share files with teammates, set permissions, and track activities effortlessly.
+                <strong>Easy Collaboration:</strong> Share files with teammates,
+                set permissions, and track activities effortlessly.
               </li>
               <li>
-                <strong>User-Centric Design:</strong> FileXpress is intuitive and easy to use, regardless of your technical expertise.
+                <strong>User-Centric Design:</strong> FileXpress is intuitive
+                and easy to use, regardless of your technical expertise.
               </li>
             </ul>
             <p>
-              Whether you're managing personal files or collaborating on work projects, FileXpress adapts to your needs and keeps your data secure.
+              Whether you're managing personal files or collaborating on work
+              projects, FileXpress adapts to your needs and keeps your data
+              secure.
             </p>
           </div>
         </div>

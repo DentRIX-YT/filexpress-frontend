@@ -1,124 +1,124 @@
 /* General Styling */
 .profile-page {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 100vh;
-    background: linear-gradient(135deg, #f7f7f7, #dae1e7, #e7f7ff);
-    background-size: 200% 200%;
-    animation: profileBackgroundShift 8s infinite alternate ease-in-out;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #f7f7f7, #dae1e7, #e7f7ff);
+  background-size: 200% 200%;
+  animation: profileBackgroundShift 8s infinite alternate ease-in-out;
+}
+
+/* Navbar */
+.profile-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 20px 30px;
+  background-color: #333;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  animation: slideDown 1.2s ease-in-out;
+}
+
+.profile-logo {
+  height: 50px;
+  cursor: pointer;
+  margin-left: 20px;
+}
+
+.profile-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin-right: 20px;
+}
+
+.profile-nav-links button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+.profile-nav-links button:hover {
+  color: #daa520;
+  transform: scale(1.1);
+}
+
+/* Profile Section */
+.profile-container {
+  text-align: center;
+  padding: 30px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 600px;
+  margin-top: 40px;
+  animation: fadeInUp 1s ease-in-out;
+}
+
+.profile-title {
+  font-size: 3rem;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.profile-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 1.2rem;
+  color: #555;
+}
+
+.profile-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 4px solid #daa520;
+  margin-bottom: 20px;
+}
+
+.profile-card p {
+  margin: 8px 0;
+}
+
+/* Animations */
+@keyframes profileBackgroundShift {
+  0% {
+    background-position: 0% 50%;
   }
-  
-  /* Navbar */
-  .profile-navbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-    padding: 20px 30px;
-    background-color: #333;
-    color: white;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    animation: slideDown 1.2s ease-in-out;
+  100% {
+    background-position: 100% 50%;
   }
-  
-  .profile-logo {
-    height: 50px;
-    cursor: pointer;
-    margin-left: 20px;
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(30%);
+    opacity: 0;
   }
-  
-  .profile-nav-links {
-    display: flex;
-    align-items: center;
-    gap: 30px;
-    margin-right: 20px;
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
-  
-  .profile-nav-links button {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
   }
-  
-  .profile-nav-links button:hover {
-    color: #daa520;
-    transform: scale(1.1);
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
-  
-  /* Profile Section */
-  .profile-container {
-    text-align: center;
-    padding: 30px;
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-    width: 90%;
-    max-width: 600px;
-    margin-top: 40px;
-    animation: fadeInUp 1s ease-in-out;
-  }
-  
-  .profile-title {
-    font-size: 3rem;
-    color: #333;
-    margin-bottom: 20px;
-  }
-  
-  .profile-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-size: 1.2rem;
-    color: #555;
-  }
-  
-  .profile-avatar {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    border: 4px solid #daa520;
-    margin-bottom: 20px;
-  }
-  
-  .profile-card p {
-    margin: 8px 0;
-  }
-  
-  /* Animations */
-  @keyframes profileBackgroundShift {
-    0% {
-      background-position: 0% 50%;
-    }
-    100% {
-      background-position: 100% 50%;
-    }
-  }
-  
-  @keyframes fadeInUp {
-    from {
-      transform: translateY(30%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-  
-  @keyframes slideDown {
-    from {
-      transform: translateY(-100%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
+}

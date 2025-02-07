@@ -65,8 +65,8 @@ const HandshakePage = () => {
   const handleSenderSelect = async () => {
     try {
       setRole("sender");
-      const newHandshakeCode = generateHandshakeCode(); // Generate the code locally
-      setHandshakeCode(newHandshakeCode); // Update state asynchronously
+      const newHandshakeCode = generateHandshakeCode();
+      setHandshakeCode(newHandshakeCode);
 
       const response = await fetch("http://localhost:8080/handshake/generate", {
         method: "POST",
@@ -75,17 +75,30 @@ const HandshakePage = () => {
         },
         body: JSON.stringify({
           senderUsername: username,
-          handshakeCode: newHandshakeCode, // Use local variable
+          handshakeCode: newHandshakeCode,
         }),
       });
 
       console.log("Handshake code generated:", newHandshakeCode);
       const data = await response.json();
-      console.log("Handshake code received from backend:", data.handshakeCode);
 
       if (data.handshakeCode === newHandshakeCode) {
-        setHandshakeCode(newHandshakeCode); // Update state synchronously
+        setHandshakeCode(newHandshakeCode);
         setAnimationClass("fade-in");
+
+        // Start polling to check if handshake is completed
+        const intervalId = setInterval(async () => {
+          const statusResponse = await fetch(
+            `http://localhost:8080/handshake/status/${username}`
+          );
+          const statusData = await statusResponse.json();
+
+          if (statusData.status === "completed") {
+            clearInterval(intervalId); // Stop polling
+            setStatusMessage("Handshake completed! Redirecting...");
+            setTimeout(() => navigate("/transfer-files"), 2000);
+          }
+        }, 3000); // Poll every 3 seconds
       }
     } catch (error) {
       console.error("Error generating handshake code:", error);

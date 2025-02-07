@@ -12,46 +12,6 @@
   animation: profileBackgroundShift 8s infinite alternate ease-in-out;
 }
 
-/* Navbar */
-.profile-navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding: 20px 30px;
-  background-color: #333;
-  color: white;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  animation: slideDown 1.2s ease-in-out;
-}
-
-.profile-logo {
-  height: 50px;
-  cursor: pointer;
-  margin-left: 20px;
-}
-
-.profile-nav-links {
-  display: flex;
-  align-items: center;
-  gap: 30px;
-  margin-right: 20px;
-}
-
-.profile-nav-links button {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
-}
-
-.profile-nav-links button:hover {
-  color: #daa520;
-  transform: scale(1.1);
-}
-
 /* Profile Section */
 .profile-container {
   text-align: center;
@@ -104,17 +64,6 @@
 @keyframes fadeInUp {
   from {
     transform: translateY(30%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes slideDown {
-  from {
-    transform: translateY(-100%);
     opacity: 0;
   }
   to {

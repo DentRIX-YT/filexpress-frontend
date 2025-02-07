@@ -6,6 +6,7 @@ import ProfilePage from "./components/ProfilePage";
 import ViewOldFilePage from "./components/ViewOldFilePage";
 import TransferFilesPage from "./components/TransferFilesPage";
 import HandshakePage from "./components/HandshakePage";
+import HandshakeProtectedRoute from "./utilities/HandshakeProtectedRoute";
 function App() {
   return (
     <Router>
@@ -17,7 +18,10 @@ function App() {
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/view-old-files" element={<ViewOldFilePage />} />
           <Route path="/HandshakePage" element={<HandshakePage />} />
-          <Route path="/transfer-files" element={<TransferFilesPage />} />
+          {/* Protect this route with handshake authentication */}
+          <Route element={<HandshakeProtectedRoute />}>
+            <Route path="/transfer-files" element={<TransferFilesPage />} />
+          </Route>
         </Routes>
       </div>
     </Router>

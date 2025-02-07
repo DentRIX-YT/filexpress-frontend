@@ -1,90 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import "../styles/HomePage.css";
-import LogoutButton from "./LogoutButton";
 import TokenWrapper from "../utilities/TokenWrapper";
-import { useNavigate } from "react-router-dom";
+import Navbar from "./Navbar";
 
 const HomePage = () => {
-  const navigate = useNavigate();
-  const [isProfileDropdownVisible, setProfileDropdownVisible] = useState(false);
-  const [username, setUsername] = useState("Loading..."); // Placeholder for username
-
-  useEffect(() => {
-    const fetchUsername = async () => {
-      const accessToken = sessionStorage.getItem("accessToken"); // Get access token from session storage
-      if (!accessToken) {
-        console.error("Access token is missing. Redirecting to login.");
-        navigate("/login");
-        return;
-      }
-
-      try {
-        const response = await fetch("http://localhost:8080/users/me", {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${accessToken}`, // Pass the token in the Authorization header
-          },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUsername(data.username); // Update the username state
-        } else {
-          console.error("Failed to fetch username. Redirecting to login.");
-          navigate("/login");
-        }
-      } catch (error) {
-        console.error("Error while fetching username:", error);
-        navigate("/login");
-      }
-    };
-
-    // Delay the fetchUsername call by 100ms
-    const timer = setTimeout(() => {
-      fetchUsername();
-    }, 100);
-
-    // Cleanup the timeout if the component unmounts
-    return () => clearTimeout(timer);
-    
-  }, [navigate]);
-
-  const toggleProfileDropdown = () => {
-    setProfileDropdownVisible((prevState) => !prevState);
-  };
+  const homeButtons = [
+    { label: "Transfer Files", path: "/HandshakePage" },
+    { label: "View Old Files", path: "/view-old-files" },
+  ];
 
   return (
     <TokenWrapper>
       <div className="home-page">
-        {/* Navigation Bar */}
-        <nav className="navbar">
-          <img
-            src="/logo-no-background-colored.png" // Update with your logo's path
-            alt="FileXpress Logo"
-            className="nav-logo"
-            onClick={() => navigate("/home")}
-          />
-          <div className="nav-links">
-            <button onClick={() => navigate("/HandshakePage")}>
-              Transfer Files
-            </button>
-            <button onClick={() => navigate("/view-old-files")}>
-              View Old Files
-            </button>
-            <div className="nav-profile">
-              <span onClick={toggleProfileDropdown} className="profile-name">
-                {username} {/* Dynamically display the username */}
-              </span>
-              {isProfileDropdownVisible && (
-                <div className="profile-dropdown">
-                  <button onClick={() => navigate("/profile")}>Profile</button>
-                  <LogoutButton />
-                </div>
-              )}
-            </div>
-          </div>
-        </nav>
-
+        <Navbar buttons={homeButtons} showUsername={true} />
         {/* About Section */}
         <div className="home-content">
           <h1>About FileXpress</h1>

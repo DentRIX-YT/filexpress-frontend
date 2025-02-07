@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from "react";
+import { openDB } from "idb";
 import "../styles/HandshakePage.css";
-import LogoutButton from "./LogoutButton";
 import TokenWrapper from "../utilities/TokenWrapper";
 import { useNavigate } from "react-router-dom";
+import Navbar from "./Navbar";
 
 const HandshakePage = () => {
   const navigate = useNavigate();
-  const [isProfileDropdownVisible, setProfileDropdownVisible] = useState(false);
   const [username, setUsername] = useState("Loading...");
-  const [role, setRole] = useState(null); // "sender" or "receiver"
+  const [role, setRole] = useState(null);
   const [handshakeCode, setHandshakeCode] = useState("");
   const [receiverCode, setReceiverCode] = useState("");
   const [passphrase, setPassphrase] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [animationClass, setAnimationClass] = useState("");
+
+  const handshakeButtons = [
+    { label: "View Old Files", path: "/view-old-files" },
+  ];
 
   useEffect(() => {
     const fetchUsername = async () => {
@@ -45,48 +49,35 @@ const HandshakePage = () => {
       }
     };
 
-    // Delay the fetchUsername call by 100ms
     const timer = setTimeout(() => {
       fetchUsername();
-    }, 100);
+    }, 150);
 
-    // Cleanup the timeout if the component unmounts
     return () => clearTimeout(timer);
   }, [navigate]);
 
-  const toggleProfileDropdown = () => {
-    setProfileDropdownVisible((prevState) => !prevState);
-  };
-
-  const generateHandshakeCode = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
+  const generateHandshakeCode = () =>
+    Math.floor(100000 + Math.random() * 900000).toString();
 
   const handleSenderSelect = async () => {
-    try {
-      setRole("sender");
-      const newHandshakeCode = generateHandshakeCode();
-      setHandshakeCode(newHandshakeCode);
+    setRole("sender");
+    const newHandshakeCode = generateHandshakeCode();
+    setHandshakeCode(newHandshakeCode);
 
+    try {
       const response = await fetch("http://localhost:8080/handshake/generate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           senderUsername: username,
           handshakeCode: newHandshakeCode,
         }),
       });
 
-      console.log("Handshake code generated:", newHandshakeCode);
       const data = await response.json();
-
       if (data.handshakeCode === newHandshakeCode) {
-        setHandshakeCode(newHandshakeCode);
         setAnimationClass("fade-in");
 
-        // Start polling to check if handshake is completed
         const intervalId = setInterval(async () => {
           const statusResponse = await fetch(
             `http://localhost:8080/handshake/status/${username}`
@@ -94,11 +85,11 @@ const HandshakePage = () => {
           const statusData = await statusResponse.json();
 
           if (statusData.status === "completed") {
-            clearInterval(intervalId); // Stop polling
+            clearInterval(intervalId);
             setStatusMessage("Handshake completed! Redirecting...");
             setTimeout(() => navigate("/transfer-files"), 2000);
           }
-        }, 3000); // Poll every 3 seconds
+        }, 3000);
       }
     } catch (error) {
       console.error("Error generating handshake code:", error);
@@ -115,7 +106,6 @@ const HandshakePage = () => {
       setStatusMessage("Handshake code must be 6 digits.");
       return;
     }
-
     if (passphrase.length < 6) {
       setStatusMessage("Passphrase must be at least 6 characters.");
       return;
@@ -124,9 +114,7 @@ const HandshakePage = () => {
     try {
       const response = await fetch("http://localhost:8080/handshake/validate", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           receiverUsername: username,
           providedHandshakeCode: receiverCode,
@@ -134,11 +122,8 @@ const HandshakePage = () => {
         }),
       });
 
-      // 🔹 Check if the response is valid JSON
-      const text = await response.text(); // Get raw text response
-      console.log("Raw API Response:", text); // Debugging
-
-      const data = text ? JSON.parse(text) : {}; // Parse JSON if not empty
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : {};
 
       if (!response.ok) {
         setStatusMessage("Server error. Try again.");
@@ -146,8 +131,8 @@ const HandshakePage = () => {
       }
 
       if (data.status === "success") {
-        setStatusMessage("Handshake successful! Redirecting...");
-        setTimeout(() => navigate("/transfer-files"), 2000);
+        handleHandshakeSuccess(data.encryptedPrivateKey, passphrase);
+
       } else if (data.status === "error") {
         setStatusMessage("Handshake failed. Check your code.");
       } else if (data.status === "error-passphrase") {
@@ -161,73 +146,151 @@ const HandshakePage = () => {
     }
   };
 
+  const decryptPrivateKey = async (encryptedKey, passphrase) => {
+    try {
+      // Split salt, IV, and encrypted data
+      const [saltBase64, ivBase64, encryptedBase64] = encryptedKey.split(":");
+  
+      const salt = new Uint8Array(
+        atob(saltBase64)
+          .split("")
+          .map((c) => c.charCodeAt(0))
+      );
+      const iv = new Uint8Array(
+        atob(ivBase64)
+          .split("")
+          .map((c) => c.charCodeAt(0))
+      );
+      const encryptedData = new Uint8Array(
+        atob(encryptedBase64)
+          .split("")
+          .map((c) => c.charCodeAt(0))
+      );
+  
+      const encoder = new TextEncoder();
+      const passphraseKey = encoder.encode(passphrase);
+  
+      // Derive AES key using PBKDF2
+      const keyMaterial = await window.crypto.subtle.importKey(
+        "raw",
+        passphraseKey,
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+      );
+  
+      const aesKey = await window.crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: 100000,
+          hash: "SHA-256",
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["decrypt"]
+      );
+  
+      // Decrypt private key
+      const decryptedBuffer = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: iv },
+        aesKey,
+        encryptedData
+      );
+  
+      const decryptedPrivateKey = new TextDecoder().decode(decryptedBuffer);
+  
+      // Store in IndexedDB
+      const db = await openDB("filexpressDB", 1, {
+        upgrade(db) {
+          db.createObjectStore("keys");
+        },
+      });
+  
+      await db.put("keys", decryptedPrivateKey, "privateKey");
+  
+      console.log("Private key stored temporarily in IndexedDB.");
+  
+      return decryptedPrivateKey;
+    } catch (error) {
+      console.error("Decryption error:", error);
+      return null;
+    }
+  };
+
+  const handleHandshakeSuccess = async (encryptedPrivateKey, passphrase) => {
+    const privateKey = await decryptPrivateKey(encryptedPrivateKey, passphrase);
+    if (privateKey) {
+      sessionStorage.setItem("handshakeAuthenticated", "true"); // Set authentication flag
+      setStatusMessage("Handshake successful! Redirecting...");
+      setTimeout(() => navigate("/transfer-files"), 2000);
+    } else {
+      console.error("Failed to decrypt private key.");
+    }
+  };
+
   return (
     <TokenWrapper>
-      <div className="tf-page">
-        <nav className="tf-navbar">
-          <img
-            src="/logo-no-background-colored.png"
-            alt="FileXpress Logo"
-            className="tf-nav-logo"
-            onClick={() => navigate("/home")}
-          />
-          <div className="tf-nav-links">
-            <button onClick={() => navigate("/view-old-files")}>
-              View Old Files
-            </button>
-            <div className="tf-nav-profile">
-              <span onClick={toggleProfileDropdown} className="tf-profile-name">
-                {username}
-              </span>
-              {isProfileDropdownVisible && (
-                <div className="tf-profile-dropdown">
-                  <button onClick={() => navigate("/profile")}>Profile</button>
-                  <LogoutButton />
-                </div>
-              )}
-            </div>
-          </div>
-        </nav>
+      <div className="handshake-page">
+        <Navbar buttons={handshakeButtons} showUsername={true} />
 
-        <div className={`tf-content ${animationClass}`}>
+        <div className={`handshake-content ${animationClass}`}>
           {!role && (
-            <div className="tf-choice">
-              <button onClick={handleSenderSelect} className="tf-button">
-                I am the Sender
-              </button>
-              <button onClick={handleReceiverSelect} className="tf-button">
-                I am the Receiver
-              </button>
+            <div className="handshake-choice">
+              <div className="handshake-buttons-container">
+                <button
+                  onClick={handleSenderSelect}
+                  className="handshake-button"
+                >
+                  I am the Sender
+                </button>
+                <button
+                  onClick={handleReceiverSelect}
+                  className="handshake-button"
+                >
+                  I am the Receiver
+                </button>
+              </div>
             </div>
           )}
 
           {role === "sender" && (
-            <div className="tf-sender">
+            <div className="handshake-sender">
               <h2>Share this code with the receiver:</h2>
-              <div className="tf-code">{handshakeCode}</div>
+              <div className="handshake-code">{handshakeCode}</div>
               <p>Wait for the receiver to enter this code.</p>
             </div>
           )}
 
           {role === "receiver" && (
-            <div className="tf-receiver">
-              <input
-                type="text"
-                maxLength="6"
-                className="tf-input"
-                placeholder="Enter 6-digit code"
-                value={receiverCode}
-                onChange={(e) => setReceiverCode(e.target.value)}
-              />
-              <input
-                type="password"
-                className="tf-input"
-                placeholder="Enter your passphrase"
-                value={passphrase}
-                onChange={(e) => setPassphrase(e.target.value)}
-              />
-              {statusMessage && <p className="tf-status">{statusMessage}</p>}
-              <button onClick={handleReceiverSubmit} className="tf-button">
+            <div className="handshake-receiver">
+              <div className="form-group">
+                <input
+                  type="text"
+                  maxLength="6"
+                  className="handshake-input"
+                  placeholder="Enter 6-digit code"
+                  value={receiverCode}
+                  onChange={(e) => setReceiverCode(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <input
+                  type="password"
+                  className="handshake-input"
+                  placeholder="Enter your passphrase"
+                  value={passphrase}
+                  onChange={(e) => setPassphrase(e.target.value)}
+                />
+              </div>
+              {statusMessage && (
+                <p className="handshake-status">{statusMessage}</p>
+              )}
+              <button
+                onClick={handleReceiverSubmit}
+                className="handshake-button"
+              >
                 Confirm Handshake
               </button>
             </div>

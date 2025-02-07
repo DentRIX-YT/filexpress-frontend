@@ -61,7 +61,7 @@ const ProfilePage = () => {
             onClick={() => navigate("/home")}
           />
           <div className="profile-nav-links">
-            <button onClick={() => navigate("/transfer-files")}>
+            <button onClick={() => navigate("/HandshakePage")}>
               Transfer Files
             </button>
             <button onClick={() => navigate("/view-old-files")}>

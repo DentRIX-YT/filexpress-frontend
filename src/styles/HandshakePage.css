@@ -1,0 +1,168 @@
+/* General Styling */
+body, .tf-page {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.tf-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #eef1f5, #d6e4f0, #f1f7ff);
+  background-size: 200% 200%;
+  animation: backgroundShift 8s infinite alternate ease-in-out;
+}
+
+/* Navigation Bar */
+.tf-navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 20px 30px;
+  background-color: #333;
+  color: white;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  animation: slideDown 1.2s ease-in-out;
+}
+
+.tf-nav-logo {
+  height: 50px;
+  cursor: pointer;
+  margin-left: 20px;
+}
+
+.tf-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 30px;
+  margin-right: 20px;
+}
+
+.tf-nav-links button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: transform 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+.tf-nav-links button:hover {
+  color: #daa520;
+  transform: scale(1.1);
+}
+
+/* Profile Dropdown */
+.tf-nav-profile {
+  position: relative;
+  font-size: 1.2rem;
+}
+
+.tf-profile-name {
+  cursor: pointer;
+  font-weight: bold;
+  transition: transform 0.3s ease-in-out;
+}
+
+.tf-profile-name:hover {
+  transform: scale(1.1);
+}
+
+.tf-profile-dropdown {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  background-color: white;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 10;
+  animation: dropdownFadeIn 0.3s ease-in-out;
+  padding: 0;
+}
+
+.tf-profile-dropdown button {
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  color: #333;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+.tf-profile-dropdown button + button {
+  border-top: 1px solid #ddd;
+}
+
+.tf-profile-dropdown button:hover {
+  background-color: #f7f7f7;
+  color: #daa520;
+}
+
+.tf-content {
+  animation: fadeInUp 0.5s ease-in-out;
+  transition: all 0.5s ease-in-out;
+}
+
+.fade-in {
+  opacity: 0;
+  animation: fadeIn 0.5s forwards;
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.tf-code {
+  font-size: 2rem;
+  font-weight: bold;
+  color: #28a745;
+  padding: 10px;
+  border: 2px dashed #28a745;
+  display: inline-block;
+  border-radius: 5px;
+}
+
+.tf-input {
+  width: 100%;
+  padding: 10px;
+  font-size: 1.1rem;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+.tf-button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px;
+  font-size: 1rem;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.tf-button:hover {
+  background-color: #0056b3;
+}
+
+.tf-status {
+  color: red;
+  font-size: 1rem;
+}

@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import CryptoJS from "crypto-js";
 import { useNavigate } from "react-router-dom";
 import "../styles/LoginPage.css";
 import PassphraseSetup from "./PassphraseSetup";
@@ -95,6 +94,61 @@ const LoginPage = () => {
     }
   };
 
+  const encryptPrivateKey = async (privateKeyBase64, passphrase) => {
+    try {
+      // Encode the passphrase
+      const encoder = new TextEncoder();
+      const passphraseKey = encoder.encode(passphrase);
+
+      // Generate a random salt
+      const salt = window.crypto.getRandomValues(new Uint8Array(16));
+
+      // Derive AES key using PBKDF2
+      const keyMaterial = await window.crypto.subtle.importKey(
+        "raw",
+        passphraseKey,
+        { name: "PBKDF2" },
+        false,
+        ["deriveKey"]
+      );
+
+      const aesKey = await window.crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: salt,
+          iterations: 100000,
+          hash: "SHA-256",
+        },
+        keyMaterial,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt"]
+      );
+
+      // Generate a random IV (Initialization Vector)
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+      // Encrypt the private key
+      const encrypted = await window.crypto.subtle.encrypt(
+        { name: "AES-GCM", iv: iv },
+        aesKey,
+        encoder.encode(privateKeyBase64)
+      );
+
+      // Convert all parts to Base64 for storage
+      const encryptedBase64 = btoa(
+        String.fromCharCode(...new Uint8Array(encrypted))
+      );
+      const ivBase64 = btoa(String.fromCharCode(...iv));
+      const saltBase64 = btoa(String.fromCharCode(...salt));
+
+      return `${saltBase64}:${ivBase64}:${encryptedBase64}`; // Format: salt:iv:encryptedData
+    } catch (error) {
+      console.error("Encryption error:", error);
+      return null;
+    }
+  };
+
   const handlePassphraseSubmit = async (passphrase) => {
     try {
       // 1. Generate RSA Key Pair
@@ -105,21 +159,34 @@ const LoginPage = () => {
           publicExponent: new Uint8Array([1, 0, 1]),
           hash: "SHA-256",
         },
-        true, // extractable keys
+        true,
         ["encrypt", "decrypt"]
       );
-  
+
       // 2. Export Keys
-      const publicKey = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
-      const privateKey = await window.crypto.subtle.exportKey("pkcs8", keyPair.privateKey);
-  
+      const publicKey = await window.crypto.subtle.exportKey(
+        "spki",
+        keyPair.publicKey
+      );
+      const privateKey = await window.crypto.subtle.exportKey(
+        "pkcs8",
+        keyPair.privateKey
+      );
+
       // 3. Convert to Base64 Strings
-      const publicKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(publicKey)));
-      const privateKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(privateKey)));
-  
-      // 4. Encrypt the Private Key with the Passphrase
-      const encryptedKey = CryptoJS.AES.encrypt(privateKeyBase64, passphrase).toString();
-  
+      const publicKeyBase64 = btoa(
+        String.fromCharCode(...new Uint8Array(publicKey))
+      );
+      const privateKeyBase64 = btoa(
+        String.fromCharCode(...new Uint8Array(privateKey))
+      );
+
+      // 4. Encrypt the Private Key with the Passphrase (Fixed AES-GCM)
+      const encryptedKey = await encryptPrivateKey(
+        privateKeyBase64,
+        passphrase
+      );
+
       // 5. Save Public Key to Backend
       await fetch("http://localhost:8080/api/public-key", {
         method: "POST",
@@ -129,17 +196,17 @@ const LoginPage = () => {
           publicKeyValue: publicKeyBase64,
         }),
       });
-  
+
       // 6. Save Encrypted Private Key to Backend
       await fetch("http://localhost:8080/api/private-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: loginUsername,
-          encryptedPrivateKey: encryptedKey,
+          encryptedPrivateKey: encryptedKey, // Now includes salt, IV, and encrypted data
         }),
       });
-  
+
       // 7. Mark User as Not New and Navigate to Home
       setIsNewUser(false);
       navigate("/home");

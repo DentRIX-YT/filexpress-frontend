@@ -65,7 +65,7 @@ const HomePage = () => {
             onClick={() => navigate("/home")}
           />
           <div className="nav-links">
-            <button onClick={() => navigate("/transfer-files")}>
+            <button onClick={() => navigate("/HandshakePage")}>
               Transfer Files
             </button>
             <button onClick={() => navigate("/view-old-files")}>

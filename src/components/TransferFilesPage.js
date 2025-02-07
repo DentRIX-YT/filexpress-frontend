@@ -5,8 +5,8 @@ const TransferFilesPage = () => {
   return (
     <TokenWrapper>
       <div>
-        <h1>Transfer Files Page</h1>
-        <p>This is a placeholder for the Transfer Files Page.</p>
+        <h1>TransferFilesPage</h1>
+        <p>This is a placeholder for the Transfer files page.</p>
       </div>
     </TokenWrapper>
   );

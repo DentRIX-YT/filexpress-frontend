@@ -63,7 +63,7 @@ const HandshakePage = () => {
     setRole("sender");
     const newHandshakeCode = generateHandshakeCode();
     setHandshakeCode(newHandshakeCode);
-
+  
     try {
       const response = await fetch("http://localhost:8080/handshake/generate", {
         method: "POST",
@@ -73,21 +73,31 @@ const HandshakePage = () => {
           handshakeCode: newHandshakeCode,
         }),
       });
-
+  
       const data = await response.json();
       if (data.handshakeCode === newHandshakeCode) {
         setAnimationClass("fade-in");
-
+  
         const intervalId = setInterval(async () => {
           const statusResponse = await fetch(
             `http://localhost:8080/handshake/status/${username}`
           );
           const statusData = await statusResponse.json();
-
+  
           if (statusData.status === "completed") {
             clearInterval(intervalId);
+            sessionStorage.setItem("handshakeAuthenticated", "true");
+  
             setStatusMessage("Handshake completed! Redirecting...");
-            setTimeout(() => navigate("/transfer-files"), 2000);
+            setTimeout(() => {
+              navigate("/transfer-files", {
+                state: {
+                  role: "sender",
+                  receiverUsername: statusData.receiverUsername, // Fetch from backend
+                  receiverPublicKey: statusData.receiverPublicKey, // Fetch from backend
+                },
+              });
+            }, 2000);
           }
         }, 3000);
       }
@@ -110,7 +120,6 @@ const HandshakePage = () => {
       setStatusMessage("Passphrase must be at least 6 characters.");
       return;
     }
-
     try {
       const response = await fetch("http://localhost:8080/handshake/validate", {
         method: "POST",
@@ -125,24 +134,28 @@ const HandshakePage = () => {
       const text = await response.text();
       const data = text ? JSON.parse(text) : {};
 
-      if (!response.ok) {
-        setStatusMessage("Server error. Try again.");
-        return;
-      }
-
-      if (data.status === "success") {
-        handleHandshakeSuccess(data.encryptedPrivateKey, passphrase);
-
-      } else if (data.status === "error") {
-        setStatusMessage("Handshake failed. Check your code.");
-      } else if (data.status === "error-passphrase") {
-        setStatusMessage("Handshake failed. Check your passphrase.");
+      if (response.ok) {
+        if (data.status === "success") {
+          handleHandshakeSuccess(data.encryptedPrivateKey, passphrase);
+        } else {
+          setStatusMessage("Unexpected response. Please try again.");
+        }
       } else {
-        setStatusMessage("Unknown error occurred.");
+        if (data.status === "failed-passphrase") {
+          setStatusMessage("Invalid passphrase. Please check and try again.");
+        } else if (data.status === "failed") {
+          setStatusMessage(
+            "Invalid handshake code. Please check and try again."
+          );
+        } else {
+          setStatusMessage("An unknown error occurred. Please try again.");
+        }
       }
     } catch (error) {
       console.error("Error validating handshake:", error);
-      setStatusMessage("An error occurred. Try again.");
+      setStatusMessage(
+        "A network error occurred. Check your connection and try again."
+      );
     }
   };
 
@@ -150,7 +163,7 @@ const HandshakePage = () => {
     try {
       // Split salt, IV, and encrypted data
       const [saltBase64, ivBase64, encryptedBase64] = encryptedKey.split(":");
-  
+
       const salt = new Uint8Array(
         atob(saltBase64)
           .split("")
@@ -166,10 +179,10 @@ const HandshakePage = () => {
           .split("")
           .map((c) => c.charCodeAt(0))
       );
-  
+
       const encoder = new TextEncoder();
       const passphraseKey = encoder.encode(passphrase);
-  
+
       // Derive AES key using PBKDF2
       const keyMaterial = await window.crypto.subtle.importKey(
         "raw",
@@ -178,7 +191,7 @@ const HandshakePage = () => {
         false,
         ["deriveKey"]
       );
-  
+
       const aesKey = await window.crypto.subtle.deriveKey(
         {
           name: "PBKDF2",
@@ -191,27 +204,27 @@ const HandshakePage = () => {
         false,
         ["decrypt"]
       );
-  
+
       // Decrypt private key
       const decryptedBuffer = await window.crypto.subtle.decrypt(
         { name: "AES-GCM", iv: iv },
         aesKey,
         encryptedData
       );
-  
+
       const decryptedPrivateKey = new TextDecoder().decode(decryptedBuffer);
-  
+
       // Store in IndexedDB
       const db = await openDB("filexpressDB", 1, {
         upgrade(db) {
           db.createObjectStore("keys");
         },
       });
-  
+
       await db.put("keys", decryptedPrivateKey, "privateKey");
-  
+
       console.log("Private key stored temporarily in IndexedDB.");
-  
+
       return decryptedPrivateKey;
     } catch (error) {
       console.error("Decryption error:", error);
@@ -224,7 +237,9 @@ const HandshakePage = () => {
     if (privateKey) {
       sessionStorage.setItem("handshakeAuthenticated", "true"); // Set authentication flag
       setStatusMessage("Handshake successful! Redirecting...");
-      setTimeout(() => navigate("/transfer-files"), 2000);
+      setTimeout(() => {
+        navigate("/transfer-files", { state: { role: "receiver" } });
+      }, 2000);
     } else {
       console.error("Failed to decrypt private key.");
     }

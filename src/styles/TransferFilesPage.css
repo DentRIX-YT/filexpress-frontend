@@ -1,0 +1,115 @@
+/* General Page Styling */
+.transfer-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100vh;
+    background: linear-gradient(135deg, #f7f7f7, #dae1e7, #e7f7ff);
+    background-size: 200% 200%;
+    animation: backgroundShift 8s infinite alternate ease-in-out;
+  }
+  
+  /* Transfer Section */
+  .transfer-content {
+    text-align: center;
+    padding: 30px;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: 700px;
+    margin-top: 40px;
+    animation: fadeInUp 1s ease-in-out;
+  }
+  
+  .transfer-content h1 {
+    font-size: 2.5rem;
+    color: #333;
+    margin-bottom: 15px;
+  }
+  
+  .transfer-content p {
+    font-size: 1.2rem;
+    color: #555;
+    margin-bottom: 20px;
+  }
+  
+  /* File Upload */
+  .file-upload-container {
+    margin: 20px 0;
+  }
+  
+  .file-input {
+    padding: 10px;
+    border: 2px solid #DAA520;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  
+  /* Transfer Button */
+  .transfer-button {
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background-color: #DAA520;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease-in-out;
+  }
+  
+  .transfer-button:hover {
+    background-color: #B8860B;
+  }
+  
+  /* File Name */
+  .file-name {
+    font-size: 1.1rem;
+    color: #333;
+    margin: 10px 0;
+  }
+  
+  /* Transfer Status */
+  .transfer-status {
+    font-size: 1.2rem;
+    color: #27ae60;
+    margin-top: 15px;
+  }
+  
+  /* Progress Bar */
+  .progress-bar {
+    width: 80%;
+    height: 8px;
+    background-color: #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 15px auto;
+  }
+  
+  .progress-fill {
+    height: 100%;
+    background-color: #3498db;
+    transition: width 0.5s ease-in-out;
+  }
+  
+  /* Keyframe Animations */
+  @keyframes backgroundShift {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+  
+  @keyframes fadeInUp {
+    from {
+      transform: translateY(30%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }

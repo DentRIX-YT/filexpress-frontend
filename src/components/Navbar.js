@@ -40,7 +40,7 @@ const Navbar = ({ buttons, showUsername = true, extraClasses = "" }) => {
 
     const timer = setTimeout(() => {
       fetchUsername();
-    }, 100);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [navigate, showUsername]);

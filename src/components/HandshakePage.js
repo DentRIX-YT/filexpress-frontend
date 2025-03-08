@@ -90,10 +90,11 @@ const HandshakePage = () => {
   
             setStatusMessage("Handshake completed! Redirecting...");
             setTimeout(() => {
-              navigate("/transfer-files", {
+              navigate("/send-file", {
                 state: {
                   role: "sender",
                   receiverUsername: statusData.receiverUsername, // Fetch from backend
+                  senderUsername: username,
                   receiverPublicKey: statusData.receiverPublicKey, // Fetch from backend
                 },
               });
@@ -136,7 +137,8 @@ const HandshakePage = () => {
 
       if (response.ok) {
         if (data.status === "success") {
-          handleHandshakeSuccess(data.encryptedPrivateKey, passphrase);
+          
+          handleHandshakeSuccess(data.encryptedPrivateKey, passphrase, data.senderUsername);
         } else {
           setStatusMessage("Unexpected response. Please try again.");
         }
@@ -232,18 +234,24 @@ const HandshakePage = () => {
     }
   };
 
-  const handleHandshakeSuccess = async (encryptedPrivateKey, passphrase) => {
+  const handleHandshakeSuccess = async (encryptedPrivateKey, passphrase, senderUsername) => {
     const privateKey = await decryptPrivateKey(encryptedPrivateKey, passphrase);
     if (privateKey) {
-      sessionStorage.setItem("handshakeAuthenticated", "true"); // Set authentication flag
-      setStatusMessage("Handshake successful! Redirecting...");
-      setTimeout(() => {
-        navigate("/transfer-files", { state: { role: "receiver" } });
-      }, 2000);
+        sessionStorage.setItem("handshakeAuthenticated", "true");
+        setStatusMessage("Handshake successful! Redirecting...");
+        
+        setTimeout(() => {
+            navigate("/receive-file", {
+                state: { 
+                    role: "receiver",
+                    senderUsername: senderUsername // ✅ Ensure this is correctly passed
+                }
+            });
+        }, 2000);
     } else {
-      console.error("Failed to decrypt private key.");
+        console.error("Failed to decrypt private key.");
     }
-  };
+};
 
   return (
     <TokenWrapper>

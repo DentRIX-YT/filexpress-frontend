@@ -1,3 +1,4 @@
+// ReceiveFilePage.js
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { startWebRTC } from "../utilities/WebRTCService";
@@ -6,30 +7,31 @@ import Navbar from "./Navbar";
 
 const ReceiveFilePage = () => {
     const location = useLocation();
+    // Expect both senderUsername and receiverUsername from navigation state
     const { senderUsername, receiverUsername } = location.state || {};
     const [receivedChunks, setReceivedChunks] = useState([]);
 
     useEffect(() => {
-        if (senderUsername) {
+        if (senderUsername && receiverUsername) {
             console.log("🎧 Receiver is waiting for file from:", senderUsername);
-            startWebRTC("receiver", receiverUsername ,senderUsername, (chunk) => {
+            // For receiver, the local username is the receiverUsername,
+            // and the peer (the sender) is senderUsername.
+            startWebRTC("receiver", receiverUsername, senderUsername, (chunk) => {
                 console.log("📩 Received chunk:", chunk);
-                setReceivedChunks((prevChunks) => [...prevChunks, chunk]);
+                setReceivedChunks((prev) => [...prev, chunk]);
             });
         } else {
-            console.error("❌ senderUsername is missing! Check handshake flow.");
+            console.error("❌ senderUsername or receiverUsername is missing! Check handshake flow.");
         }
-    }, [senderUsername]);
+    }, [senderUsername, receiverUsername]);
 
     const handleSaveFile = () => {
         if (receivedChunks.length === 0) return;
-        
         const receivedBuffer = new Blob(receivedChunks);
         const link = document.createElement("a");
         link.href = URL.createObjectURL(receivedBuffer);
         link.download = "received_file";
         link.click();
-    
         console.log("💾 File saved successfully.");
     };
 

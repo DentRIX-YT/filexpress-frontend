@@ -1,3 +1,4 @@
+// WebRTCService.js
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
@@ -6,7 +7,7 @@ let dataChannel;
 let stompClient;
 let onDataChannelOpen = () => { };
 let onDataReceivedCallback = () => { };
-let isStompConnected = false; // ✅ Track STOMP connection status
+let isStompConnected = false; // Track STOMP connection status
 
 export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
     onDataReceivedCallback = onDataReceived;
@@ -27,6 +28,8 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
         stompClient.subscribe("/topic/signaling", (message) => {
             const data = JSON.parse(message.body);
             console.log("📩 Received signaling message:", data);
+            // Debug: output the intended recipient and local username
+            console.log(`Received message with "to": "${data.to}"; Local username: "${username}"`);
 
             if (data.type === "offer") {
                 // Check if the offer message is intended for the current user
@@ -36,9 +39,7 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
                 }
                 console.log("📡 Applying SDP offer...");
                 peerConnection
-                    .setRemoteDescription(
-                        new RTCSessionDescription({ type: "offer", sdp: data.sdp })
-                    )
+                    .setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: data.sdp }))
                     .then(() => peerConnection.createAnswer())
                     .then((answer) => {
                         peerConnection.setLocalDescription(answer);
@@ -47,8 +48,8 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
                             body: JSON.stringify({
                                 type: "answer",
                                 sdp: answer.sdp,
-                                from: data.to, // current user sending the answer
-                                to: data.from, // original sender of the offer
+                                from: username,   // current user sending the answer
+                                to: data.from,    // original sender of the offer
                             }),
                         });
                     })
@@ -59,24 +60,19 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
                     console.log("Answer message not for me, ignoring.");
                     return;
                 }
-                // Optionally, ignore if remoteDescription is already set:
                 if (peerConnection.remoteDescription) {
-                    console.log(
-                        "Remote description already set, ignoring duplicate answer."
-                    );
+                    console.log("Remote description already set, ignoring duplicate answer.");
                     return;
                 }
                 console.log("📡 Applying SDP answer...");
-                peerConnection.setRemoteDescription(
-                    new RTCSessionDescription({ type: "answer", sdp: data.sdp })
-                );
+                peerConnection.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: data.sdp }));
             }
         });
     };
 
-    stompClient.activate(); // ✅ Starts STOMP connection asynchronously
+    stompClient.activate(); // Starts STOMP connection asynchronously
 
-    // ✅ Wait for STOMP to be ready before proceeding
+    // Wait for STOMP to be ready before proceeding
     const checkStompReady = setInterval(() => {
         if (isStompConnected) {
             clearInterval(checkStompReady);
@@ -88,9 +84,9 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
 const initializePeerConnection = (role, peerUsername, username) => {
     const config = {
         iceServers: [
-            { urls: "stun:stun.l.google.com:19302" }, // ✅ Public STUN server
+            { urls: "stun:stun.l.google.com:19302" }, // Public STUN server
             {
-                urls: "turn:turnserver.metered.ca:80", // ✅ Free reliable TURN server
+                urls: "turn:turnserver.metered.ca:80",  // Free TURN server
                 username: "open",
                 credential: "open",
             },
@@ -98,6 +94,21 @@ const initializePeerConnection = (role, peerUsername, username) => {
     };
 
     peerConnection = new RTCPeerConnection(config);
+
+    // Log ICE candidates for debugging
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            console.log("New ICE candidate:", event.candidate);
+            // Optionally send candidate via signaling if your implementation requires it.
+        } else {
+            console.log("All ICE candidates have been sent.");
+        }
+    };
+
+    // Monitor ICE connection state changes
+    peerConnection.oniceconnectionstatechange = () => {
+        console.log("ICE connection state:", peerConnection.iceConnectionState);
+    };
 
     if (role === "sender") {
         console.log("📡 Sender: Creating DataChannel...");
@@ -108,10 +119,11 @@ const initializePeerConnection = (role, peerUsername, username) => {
             onDataChannelOpen();
         };
 
+        dataChannel.onerror = (error) => console.error("DataChannel error:", error);
+
         createAndSendOffer(peerUsername, username);
     } else if (role === "receiver") {
         console.log("🎧 Receiver: Waiting for DataChannel...");
-
         peerConnection.ondatachannel = (event) => {
             dataChannel = event.channel;
 
@@ -123,6 +135,8 @@ const initializePeerConnection = (role, peerUsername, username) => {
                 console.log("📩 Receiver: Received DataChunk!");
                 onDataReceivedCallback(event.data);
             };
+
+            dataChannel.onerror = (error) => console.error("DataChannel error:", error);
         };
     }
 };
@@ -130,7 +144,7 @@ const initializePeerConnection = (role, peerUsername, username) => {
 const createAndSendOffer = (peerUsername, username) => {
     if (!isStompConnected) {
         console.error("❌ STOMP is not connected yet, retrying...");
-        setTimeout(() => createAndSendOffer(peerUsername), 500);
+        setTimeout(() => createAndSendOffer(peerUsername, username), 500);
         return;
     }
 
@@ -138,13 +152,12 @@ const createAndSendOffer = (peerUsername, username) => {
         .createOffer()
         .then((offer) => {
             peerConnection.setLocalDescription(offer);
-
             console.log("📡 Sending SDP Offer...");
             stompClient.publish({
                 destination: "/app/signal",
                 body: JSON.stringify({
                     type: "offer",
-                    sdp: offer.sdp, // Convert SDP to a string
+                    sdp: offer.sdp,
                     from: username,
                     to: peerUsername,
                 }),
@@ -168,7 +181,6 @@ export const sendFile = (file) => {
     reader.onload = (event) => {
         const fileBuffer = event.target.result;
         const totalChunks = Math.ceil(fileBuffer.byteLength / chunkSize);
-
         console.log(`📦 Splitting file into ${totalChunks} chunks`);
 
         while (offset < fileBuffer.byteLength) {
@@ -176,7 +188,6 @@ export const sendFile = (file) => {
             dataChannel.send(chunk);
             offset += chunkSize;
         }
-
         console.log("✅ File sent successfully.");
     };
 

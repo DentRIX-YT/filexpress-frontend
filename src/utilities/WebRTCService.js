@@ -86,9 +86,9 @@ const initializePeerConnection = (role, peerUsername, username) => {
         iceServers: [
             { urls: "stun:stun.l.google.com:19302" }, // Public STUN server
             {
-                urls: "turn:turnserver.metered.ca:80",  // Free TURN server
-                username: "open",
-                credential: "open",
+                urls: "turn:global.relay.metered.ca:80",  // Free TURN server
+                username: "0761e8061a1e5890b6aa1b79",
+                credential: "ZJd1um/lC9LIoo9f",
             },
         ],
     };
@@ -141,29 +141,49 @@ const initializePeerConnection = (role, peerUsername, username) => {
     }
 };
 
-const createAndSendOffer = (peerUsername, username) => {
+const createAndSendOffer = async (peerUsername, username) => {
     if (!isStompConnected) {
         console.error("❌ STOMP is not connected yet, retrying...");
         setTimeout(() => createAndSendOffer(peerUsername, username), 500);
         return;
     }
 
-    peerConnection
-        .createOffer()
-        .then((offer) => {
-            peerConnection.setLocalDescription(offer);
-            console.log("📡 Sending SDP Offer...");
-            stompClient.publish({
-                destination: "/app/signal",
-                body: JSON.stringify({
-                    type: "offer",
-                    sdp: offer.sdp,
-                    from: username,
-                    to: peerUsername,
-                }),
-            });
-        })
-        .catch((error) => console.error("🚨 Error creating SDP Offer:", error));
+    try {
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(offer);
+
+        console.log("⏳ Waiting for ICE gathering to complete...");
+
+        // Wait until ICE gathering is complete
+        const waitForIceGathering = new Promise((resolve) => {
+            if (peerConnection.iceGatheringState === "complete") {
+                resolve();
+            } else {
+                const checkState = () => {
+                    if (peerConnection.iceGatheringState === "complete") {
+                        peerConnection.removeEventListener("icegatheringstatechange", checkState);
+                        resolve();
+                    }
+                };
+                peerConnection.addEventListener("icegatheringstatechange", checkState);
+            }
+        });
+
+        await waitForIceGathering;
+
+        console.log("📡 Sending SDP Offer...");
+        stompClient.publish({
+            destination: "/app/signal",
+            body: JSON.stringify({
+                type: "offer",
+                sdp: peerConnection.localDescription.sdp,
+                from: username,
+                to: peerUsername,
+            }),
+        });
+    } catch (error) {
+        console.error("🚨 Error creating or sending SDP Offer:", error);
+    }
 };
 
 export const sendFile = (file) => {

@@ -27,10 +27,10 @@ const ReceiveFilePage = () => {
 
     const handleSaveFile = () => {
         if (receivedChunks.length === 0) return;
-        const receivedBuffer = new Blob(receivedChunks);
+        const receivedBuffer = new Blob(receivedChunks, { type: "image/png" });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(receivedBuffer);
-        link.download = "received_file";
+        link.download = "received_file.png";
         link.click();
         console.log("💾 File saved successfully.");
     };

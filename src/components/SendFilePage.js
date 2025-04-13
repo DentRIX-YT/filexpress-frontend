@@ -9,7 +9,7 @@ const SendFilePage = () => {
     const location = useLocation();
     const navigate = useNavigate();
     // Extract both senderUsername and receiverUsername
-    const { senderUsername, receiverUsername } = location.state || {};
+    const { senderUsername, receiverUsername, receiverPublicKey } = location.state || {};
     const [selectedFile, setSelectedFile] = useState(null);
     const [statusMessage, setStatusMessage] = useState("");
 
@@ -52,7 +52,7 @@ const SendFilePage = () => {
     
         setStatusMessage("Waiting for DataChannel to open...");
         try {
-            sendFile(selectedFile);
+            sendFile(selectedFile, receiverPublicKey);
             setStatusMessage("File sent successfully!");
         } catch (error) {
             console.error("File transfer failed:", error);

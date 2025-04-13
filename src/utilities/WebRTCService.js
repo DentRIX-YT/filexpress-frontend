@@ -1,6 +1,9 @@
 // WebRTCService.js
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
+import { openDB } from "idb";
+import { generateAESKey, encryptFile, decryptFile, encryptAESKeyWithPublicKey, decryptAESKeyWithPrivateKey } from "../utilities/EncryptionUtilss.js";
+
 
 let peerConnection;
 let dataChannel;
@@ -8,6 +11,8 @@ let stompClient;
 let onDataChannelOpen = () => { };
 let onDataReceivedCallback = () => { };
 let isStompConnected = false; // Track STOMP connection status
+let receivedChunks = [];
+let receivedMetadata = null;
 
 export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
     onDataReceivedCallback = onDataReceived;
@@ -131,9 +136,50 @@ const initializePeerConnection = (role, peerUsername, username) => {
                 console.log("✅ Receiver: DataChannel Opened!");
             };
 
-            dataChannel.onmessage = (event) => {
-                console.log("📩 Receiver: Received DataChunk!");
-                onDataReceivedCallback(event.data);
+            dataChannel.onmessage = async (event) => {
+                if (typeof event.data === "string") {
+                    const parsed = JSON.parse(event.data);
+                    if (parsed.type === "metadata") {
+                        receivedMetadata = parsed.metadata;
+                        receivedChunks = [];
+                        console.log("📩 Received metadata:", receivedMetadata);
+                    }
+                } else {
+                    console.log("📩 Receiver: Received DataChunk!");
+                    receivedChunks.push(event.data);
+
+                    const receivedSize = receivedChunks.reduce((acc, chunk) => acc + chunk.size, 0);
+                    if (receivedMetadata && receivedSize >= receivedMetadata.totalSize) {
+                        const encryptedBlob = new Blob(receivedChunks);
+                        const arrayBuffer = await encryptedBlob.arrayBuffer();
+
+                        const db = await openDB("filexpressDB", 1);
+                        const privateKeyPem = await db.get("keys", "privateKey");
+
+                        const decryptedAESKey = await decryptAESKeyWithPrivateKey(
+                            new Uint8Array(receivedMetadata.encryptedAESKey),
+                            privateKeyPem
+                        );
+
+                        const aesKeyBytes = typeof decryptedAESKey === "string"
+                            ? new TextEncoder().encode(decryptedAESKey)
+                            : decryptedAESKey;
+
+                        const decryptedBuffer = await decryptFile(
+                            arrayBuffer,
+                            aesKeyBytes,
+                            new Uint8Array(receivedMetadata.iv)
+                        );
+
+                        const finalBlob = new Blob([decryptedBuffer]);
+                        const link = document.createElement("a");
+                        link.href = URL.createObjectURL(finalBlob);
+                        link.download = receivedMetadata.filename;
+                        link.click();
+
+                        console.log("💾 File saved successfully.");
+                    }
+                }
             };
 
             dataChannel.onerror = (error) => console.error("DataChannel error:", error);
@@ -186,30 +232,36 @@ const createAndSendOffer = async (peerUsername, username) => {
     }
 };
 
-export const sendFile = (file) => {
+export const sendFile = async (file, recipientPublicKeyPem) => {
     if (!dataChannel || dataChannel.readyState !== "open") {
         console.error("❌ DataChannel is not open yet.");
         return;
     }
 
+    const fileBuffer = await file.arrayBuffer();
+    const aesKey = await generateAESKey();
+    const iv = window.crypto.getRandomValues(new Uint8Array(12)); // או 16, אבל 12 זה מומלץ ל־AES-GCM
+    const encrypted = await encryptFile(fileBuffer, aesKey, iv);
+    const encryptedAESKey = await encryptAESKeyWithPublicKey(aesKey, recipientPublicKeyPem);
+
     console.log(`📤 Sending file: ${file.name}`);
 
-    const chunkSize = 16384; // 16 KB per chunk
+    const metadata = {
+        filename: file.name,
+        iv: Array.from(iv),
+        encryptedAESKey: Array.from(new Uint8Array(encryptedAESKey)),
+        totalSize: encrypted.byteLength
+    };
+    dataChannel.send(JSON.stringify({ type: "metadata", metadata }));
+
+    const chunkSize = 16384;
     let offset = 0;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        const fileBuffer = event.target.result;
-        const totalChunks = Math.ceil(fileBuffer.byteLength / chunkSize);
-        console.log(`📦 Splitting file into ${totalChunks} chunks`);
+    while (offset < encrypted.byteLength) {
+        const chunk = encrypted.slice(offset, offset + chunkSize);
+        dataChannel.send(chunk);
+        offset += chunkSize;
+    }
 
-        while (offset < fileBuffer.byteLength) {
-            const chunk = fileBuffer.slice(offset, offset + chunkSize);
-            dataChannel.send(chunk);
-            offset += chunkSize;
-        }
-        console.log("✅ File sent successfully.");
-    };
-
-    reader.readAsArrayBuffer(file);
+    console.log("✅ File sent successfully.");
 };

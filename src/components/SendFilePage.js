@@ -31,7 +31,7 @@ const SendFilePage = () => {
             })
             .then(data => {
                 console.log("✅ WebRTC Session Started by Server:", data);
-                startWebRTC("sender", receiverUsername);
+                startWebRTC("sender", senderUsername, receiverUsername);
             })
             .catch(error => console.error("❌ WebRTC Session Failed:", error));
         } else {

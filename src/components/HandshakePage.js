@@ -244,7 +244,8 @@ const HandshakePage = () => {
             navigate("/receive-file", {
                 state: { 
                     role: "receiver",
-                    senderUsername: senderUsername // ✅ Ensure this is correctly passed
+                    senderUsername: senderUsername, // ✅ Ensure this is correctly passed
+                    receiverUsername: username
                 }
             });
         }, 2000);

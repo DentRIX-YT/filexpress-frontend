@@ -4,11 +4,11 @@ import SockJS from "sockjs-client";
 let peerConnection;
 let dataChannel;
 let stompClient;
-let onDataChannelOpen = () => {};
-let onDataReceivedCallback = () => {};
+let onDataChannelOpen = () => { };
+let onDataReceivedCallback = () => { };
 let isStompConnected = false; // ✅ Track STOMP connection status
 
-export const startWebRTC = (role, peerUsername, onDataReceived) => {
+export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
     onDataReceivedCallback = onDataReceived;
 
     console.log(`🔗 WebRTC Role: ${role}, Peer: ${peerUsername}`);
@@ -23,25 +23,53 @@ export const startWebRTC = (role, peerUsername, onDataReceived) => {
     stompClient.onConnect = () => {
         console.log("✅ Connected to WebSocket signaling server.");
         isStompConnected = true;
-    
+
         stompClient.subscribe("/topic/signaling", (message) => {
             const data = JSON.parse(message.body);
             console.log("📩 Received signaling message:", data);
-    
+
             if (data.type === "offer") {
+                // Check if the offer message is intended for the current user
+                if (data.to !== username) {
+                    console.log("Offer message not for me, ignoring.");
+                    return;
+                }
                 console.log("📡 Applying SDP offer...");
-                peerConnection.setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: data.sdp }))
+                peerConnection
+                    .setRemoteDescription(
+                        new RTCSessionDescription({ type: "offer", sdp: data.sdp })
+                    )
                     .then(() => peerConnection.createAnswer())
-                    .then(answer => {
+                    .then((answer) => {
                         peerConnection.setLocalDescription(answer);
                         stompClient.publish({
                             destination: "/app/signal",
-                            body: JSON.stringify({ type: "answer", sdp: answer.sdp, from: data.to })
+                            body: JSON.stringify({
+                                type: "answer",
+                                sdp: answer.sdp,
+                                from: data.to, // current user sending the answer
+                                to: data.from, // original sender of the offer
+                            }),
                         });
-                    });
+                    })
+                    .catch((error) => console.error("Error handling offer:", error));
             } else if (data.type === "answer") {
+                // Only process the answer if it is meant for me.
+                if (data.to !== username) {
+                    console.log("Answer message not for me, ignoring.");
+                    return;
+                }
+                // Optionally, ignore if remoteDescription is already set:
+                if (peerConnection.remoteDescription) {
+                    console.log(
+                        "Remote description already set, ignoring duplicate answer."
+                    );
+                    return;
+                }
                 console.log("📡 Applying SDP answer...");
-                peerConnection.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: data.sdp }));
+                peerConnection.setRemoteDescription(
+                    new RTCSessionDescription({ type: "answer", sdp: data.sdp })
+                );
             }
         });
     };
@@ -52,21 +80,21 @@ export const startWebRTC = (role, peerUsername, onDataReceived) => {
     const checkStompReady = setInterval(() => {
         if (isStompConnected) {
             clearInterval(checkStompReady);
-            initializePeerConnection(role, peerUsername);
+            initializePeerConnection(role, peerUsername, username);
         }
     }, 100);
 };
 
-const initializePeerConnection = (role, peerUsername) => {
+const initializePeerConnection = (role, peerUsername, username) => {
     const config = {
         iceServers: [
             { urls: "stun:stun.l.google.com:19302" }, // ✅ Public STUN server
-            { 
+            {
                 urls: "turn:turnserver.metered.ca:80", // ✅ Free reliable TURN server
-                username: "open", 
-                credential: "open" 
-            }
-        ]
+                username: "open",
+                credential: "open",
+            },
+        ],
     };
 
     peerConnection = new RTCPeerConnection(config);
@@ -80,7 +108,7 @@ const initializePeerConnection = (role, peerUsername) => {
             onDataChannelOpen();
         };
 
-        createAndSendOffer(peerUsername);
+        createAndSendOffer(peerUsername, username);
     } else if (role === "receiver") {
         console.log("🎧 Receiver: Waiting for DataChannel...");
 
@@ -99,28 +127,30 @@ const initializePeerConnection = (role, peerUsername) => {
     }
 };
 
-const createAndSendOffer = (peerUsername) => {
+const createAndSendOffer = (peerUsername, username) => {
     if (!isStompConnected) {
         console.error("❌ STOMP is not connected yet, retrying...");
         setTimeout(() => createAndSendOffer(peerUsername), 500);
         return;
     }
 
-    peerConnection.createOffer()
-        .then(offer => {
+    peerConnection
+        .createOffer()
+        .then((offer) => {
             peerConnection.setLocalDescription(offer);
 
             console.log("📡 Sending SDP Offer...");
             stompClient.publish({
                 destination: "/app/signal",
-                body: JSON.stringify({ 
-                    type: "offer", 
+                body: JSON.stringify({
+                    type: "offer",
                     sdp: offer.sdp, // Convert SDP to a string
-                    from: peerUsername 
-                })
+                    from: username,
+                    to: peerUsername,
+                }),
             });
         })
-        .catch(error => console.error("🚨 Error creating SDP Offer:", error));
+        .catch((error) => console.error("🚨 Error creating SDP Offer:", error));
 };
 
 export const sendFile = (file) => {

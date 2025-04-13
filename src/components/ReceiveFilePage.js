@@ -6,13 +6,13 @@ import Navbar from "./Navbar";
 
 const ReceiveFilePage = () => {
     const location = useLocation();
-    const { senderUsername } = location.state || {};  
+    const { senderUsername, receiverUsername } = location.state || {};
     const [receivedChunks, setReceivedChunks] = useState([]);
 
     useEffect(() => {
         if (senderUsername) {
             console.log("🎧 Receiver is waiting for file from:", senderUsername);
-            startWebRTC("receiver", senderUsername, (chunk) => {
+            startWebRTC("receiver", receiverUsername ,senderUsername, (chunk) => {
                 console.log("📩 Received chunk:", chunk);
                 setReceivedChunks((prevChunks) => [...prevChunks, chunk]);
             });

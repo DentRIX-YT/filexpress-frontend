@@ -106,10 +106,17 @@ const initializePeerConnection = (role, peerUsername, username) => {
     // Log ICE candidates for debugging
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-            console.log("New ICE candidate:", event.candidate);
-            // Optionally send candidate via signaling if your implementation requires it.
+            const candidateStr = event.candidate.candidate;
+            const protocolMatch = candidateStr.match(/(udp|tcp)/i);
+            const typeMatch = candidateStr.match(/typ (\w+)/i);
+
+            const protocol = protocolMatch ? protocolMatch[1] : "unknown";
+            const candidateType = typeMatch ? typeMatch[1] : "unknown";
+
+            console.log(`📡 ICE candidate: protocol=${protocol}, type=${candidateType}`);
+            console.log("📥 Full candidate string:", candidateStr);
         } else {
-            console.log("All ICE candidates have been sent.");
+            console.log("✅ All ICE candidates have been sent.");
         }
     };
 
@@ -167,6 +174,19 @@ const initializePeerConnection = (role, peerUsername, username) => {
                         const aesKeyBytes = typeof decryptedAESKey === "string"
                             ? new TextEncoder().encode(decryptedAESKey)
                             : decryptedAESKey;
+
+                        const encryptedBuffer = await encryptedBlob.arrayBuffer(); // ממיר Blob ל־ArrayBuffer
+                        const receivedHashBuffer = await crypto.subtle.digest("SHA-256", encryptedBuffer);
+                        const receivedHashArray = Array.from(new Uint8Array(receivedHashBuffer));
+
+                        const originalHash = receivedMetadata.sha256;
+                        const hashesMatch = JSON.stringify(receivedHashArray) === JSON.stringify(originalHash);
+
+                        if (!hashesMatch) {
+                            console.error("❌ File hash mismatch – file corrupted or tampered!");
+                            alert("File transfer failed due to hash mismatch.");
+                            return;
+                        }
 
                         const decryptedBuffer = await decryptFile(
                             arrayBuffer,
@@ -249,11 +269,15 @@ export const sendFile = async (file, recipientPublicKeyPem) => {
 
     console.log(`📤 Sending file: ${file.name}`);
 
+    const hashBuffer = await crypto.subtle.digest("SHA-256", encrypted);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+
     const metadata = {
         filename: file.name,
         iv: Array.from(iv),
         encryptedAESKey: Array.from(new Uint8Array(encryptedAESKey)),
-        totalSize: encrypted.byteLength
+        totalSize: encrypted.byteLength,
+        sha256: hashArray
     };
     dataChannel.send(JSON.stringify({ type: "metadata", metadata }));
 

@@ -14,8 +14,11 @@ let isStompConnected = false; // Track STOMP connection status
 let receivedChunks = [];
 let receivedMetadata = null;
 
-export const startWebRTC = (role, username, peerUsername, onDataReceived) => {
+export const startWebRTC = (role, username, peerUsername, onDataReceived, onChannelOpenCallback) => {
     onDataReceivedCallback = onDataReceived;
+    if (onChannelOpenCallback) {
+        onDataChannelOpen = onChannelOpenCallback;
+    }
 
     console.log(`🔗 WebRTC Role: ${role}, Peer: ${peerUsername}`);
 

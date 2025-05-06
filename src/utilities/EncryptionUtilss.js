@@ -1,7 +1,6 @@
-import { openDB } from "idb";
 
 // Decrypts the private key using AES-GCM and stores it in IndexedDB
-export async function decryptAndStorePrivateKey(encryptedKey, passphrase) {
+export async function decryptAndCachePrivateKey(encryptedKey, passphrase) {
     try {
         const [saltBase64, ivBase64, encryptedBase64] = encryptedKey.split(":");
 
@@ -41,24 +40,17 @@ export async function decryptAndStorePrivateKey(encryptedKey, passphrase) {
 
         const decryptedPrivateKey = new TextDecoder().decode(decryptedBuffer);
 
-        // Make sure object store 'keys' exists
-        const db = await openDB("filexpressDB", 1, {
-            upgrade(db) {
-                if (!db.objectStoreNames.contains("keys")) {
-                    db.createObjectStore("keys");
-                }
-            }
-        });
+        // Instead of saving to IndexedDB, cache in memory
+        window.sessionPrivateKey = decryptedPrivateKey;
 
-        await db.put("keys", decryptedPrivateKey, "privateKey");
-
-        console.log("Private key stored in IndexedDB.");
+        console.log("Private key cached in memory.");
         return decryptedPrivateKey;
     } catch (error) {
         console.error("Decryption error:", error);
         return null;
     }
 }
+
 
 
 // Generate a 256-bit AES key for encryption and decryption
@@ -157,6 +149,5 @@ export async function decryptAESKeyWithPrivateKey(
 }
 
 export const deletePrivateKey = async () => {
-    const db = await openDB("filexpressDB", 1);
-    await db.delete("keys", "privateKey");
+    window.sessionPrivateKey = null;
 };

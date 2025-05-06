@@ -1,7 +1,6 @@
 // WebRTCService.js
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
-import { openDB } from "idb";
 import {
     generateAESKey,
     encryptFile,
@@ -234,8 +233,8 @@ const initializePeerConnection = (role, peerUsername, username) => {
                         const encryptedBlob = new Blob(receivedChunks);
                         const arrayBuffer = await encryptedBlob.arrayBuffer();
 
-                        const db = await openDB("filexpressDB", 1);
-                        const privateKeyPem = await db.get("keys", "privateKey");
+                        const privateKeyPem = window.sessionPrivateKey;
+
 
                         // Check if privateKeyPem is null
                         if (!privateKeyPem) {
@@ -292,6 +291,8 @@ const initializePeerConnection = (role, peerUsername, username) => {
                             decryptedBuffer,
                             metadata: receivedMetadata,
                         });
+
+                        window.sessionPrivateKey = null;
 
                         // Signal to sender that the transfer is complete
                         dataChannel.send(JSON.stringify({ type: "transfer-complete" }));
@@ -358,7 +359,7 @@ const createAndSendOffer = async (peerUsername, username) => {
 
 // function to send a file over the DataChannel
 // This function encrypts the file using AES encryption
-export const sendFile = async (file, recipientPublicKeyPem, onProgress) => {
+export const sendFile = async (file, recipientPublicKeyPem, onProgress, transferMethod = "CLIENT_TO_CLIENT") => {
     if (!dataChannel || dataChannel.readyState !== "open") {
         console.error("DataChannel is not open yet.");
         return;

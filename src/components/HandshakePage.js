@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { decryptAndStorePrivateKey } from "../utilities/EncryptionUtilss";
+import { decryptAndCachePrivateKey } from "../utilities/EncryptionUtilss";
 import "../styles/HandshakePage.css";
 import TokenWrapper from "../utilities/TokenWrapper"; // Auth wrapper component
 import { useNavigate } from "react-router-dom";
@@ -170,7 +170,7 @@ const HandshakePage = () => {
 
   // Handles successful handshake after decrypting private key
   const handleHandshakeSuccess = async (encryptedPrivateKey, passphrase, senderUsername) => {
-    const privateKey = await decryptAndStorePrivateKey(encryptedPrivateKey, passphrase);
+    const privateKey = await decryptAndCachePrivateKey(encryptedPrivateKey, passphrase);
     if (privateKey) {
       sessionStorage.setItem("handshakeAuthenticated", "true");
       setStatusMessage("Handshake successful! Redirecting...");

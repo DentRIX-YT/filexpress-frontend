@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import "../styles/SendFilePage.css"; // Styles specific to the SendFilePage component
-import { deletePrivateKey } from "../utilities/EncryptionUtilss";
 import { useLocation, useNavigate } from "react-router-dom";
 import { validateHandshakeFromServer } from "../utilities/guardUtils";
 import {

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { openDB } from "idb"; // IndexedDB wrapper for storing decrypted private keys
 import { decryptAndStorePrivateKey } from "../utilities/EncryptionUtilss";
 import "../styles/HandshakePage.css";
 import TokenWrapper from "../utilities/TokenWrapper"; // Auth wrapper component

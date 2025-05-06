@@ -24,6 +24,7 @@ const SendFilePage = () => {
     const [isDataChannelOpen, setIsDataChannelOpen] = useState(false); // Tracks DataChannel readiness
     const [transferProgress, setTransferProgress] = useState(0); // File transfer progress (0–100%)
     const [isTransferring, setIsTransferring] = useState(false); // Indicates ongoing transfer
+    const [transferMethod, setTransferMethod] = useState("CLIENT_TO_CLIENT");
 
     // Establish WebRTC connection on component mount
     useEffect(() => {
@@ -32,16 +33,19 @@ const SendFilePage = () => {
                 navigate("/HandshakePage");
                 return;
             }
-    
-            const isValid = await validateHandshakeFromServer(senderUsername, receiverUsername);
+
+            const isValid = await validateHandshakeFromServer(
+                senderUsername,
+                receiverUsername
+            );
             if (!isValid) {
                 console.warn("🚫 Invalid or missing handshake. Redirecting.");
                 navigate("/HandshakePage");
                 return;
             }
-    
+
             console.log("📤 Sender is preparing connection to:", receiverUsername);
-    
+
             // Notify backend to initiate WebRTC signaling
             fetch("http://localhost:8080/webrtc/start-webrtc", {
                 method: "POST",
@@ -61,7 +65,7 @@ const SendFilePage = () => {
                 })
                 .then((data) => {
                     console.log("WebRTC Session Started by Server:", data);
-    
+
                     startWebRTC(
                         "sender",
                         senderUsername,
@@ -69,32 +73,39 @@ const SendFilePage = () => {
                         null,
                         () => {
                             setIsDataChannelOpen(true);
-                            setStatusMessage("DataChannel is open. You may now send the file.");
+                            setStatusMessage(
+                                "DataChannel is open. You may now send the file."
+                            );
                         },
                         () => {
                             console.log("Transfer confirmed by receiver. Cleaning up...");
                             closeWebRTCConnection();
-                            fetch(`http://localhost:8080/webrtc/disconnect?username=${senderUsername}`, {
-                                method: "DELETE",
-                            });
-                            fetch(`http://localhost:8080/handshake/remove/${senderUsername}`, {
-                                method: "DELETE",
-                            });
+                            fetch(
+                                `http://localhost:8080/webrtc/disconnect?username=${senderUsername}`,
+                                {
+                                    method: "DELETE",
+                                }
+                            );
+                            fetch(
+                                `http://localhost:8080/handshake/remove/${senderUsername}`,
+                                {
+                                    method: "DELETE",
+                                }
+                            );
                             navigate("/home");
                         }
                     );
                 })
                 .catch((error) => console.error("WebRTC Session Failed:", error));
         };
-    
+
         validateAndStart();
-    
+
         return () => {
             // Prevent returning to the page after leaving
             window.history.replaceState({}, document.title);
         };
     }, [receiverUsername, senderUsername, location.state, navigate]);
-    
 
     // Handles file input changes
     const handleFileChange = (event) => {
@@ -125,14 +136,11 @@ const SendFilePage = () => {
 
             setIsTransferring(false);
             setStatusMessage("File sent successfully!");
-
-            
         } catch (error) {
             console.error("File transfer failed:", error);
             setStatusMessage("File transfer failed.");
         }
     };
-
 
     return (
         <TokenWrapper>
@@ -155,6 +163,27 @@ const SendFilePage = () => {
                         className="file-input"
                     />
 
+                    <div className="transfer-method-section">
+                        <label htmlFor="transferMethod">
+                            <strong>Choose Transfer Mode:</strong>
+                        </label>
+                        <select
+                            id="transferMethod"
+                            value={transferMethod}
+                            onChange={(e) => setTransferMethod(e.target.value)}
+                        >
+                            <option value="CLIENT_TO_CLIENT">
+                                Direct: Sender ➝ Receiver
+                            </option>
+                            <option value="CLIENT_TO_BOTH">
+                                Dual: Sender ➝ Receiver + Server
+                            </option>
+                            <option value="SERVER_RELAY">
+                                Relay: Sender ➝ Server ➝ Receiver
+                            </option>
+                        </select>
+                    </div>
+
                     {/* Transfer button (disabled until DataChannel is open) */}
                     <button
                         className="transfer-button"
@@ -163,8 +192,6 @@ const SendFilePage = () => {
                     >
                         Start Transfer
                     </button>
-
-                    <p>{transferProgress}%</p>
 
 
                     {/* Progress bar and percent */}

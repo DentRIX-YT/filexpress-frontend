@@ -91,6 +91,23 @@
     font-size: 1.1rem;
     color: #333;
   }
+
+  .transfer-method-section {
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+  }
+  
+  .transfer-method-section label {
+    margin-right: 10px;
+  }
+  
+  .transfer-method-section select {
+    padding: 8px 12px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+  }
+  
   
   /* Animations */
   @keyframes backgroundShift {
@@ -112,4 +129,6 @@
       opacity: 1;
     }
   }
+
+  
   

@@ -21,6 +21,7 @@ const ReceiveFilePage = () => {
     const [receivedChunks, setReceivedChunks] = useState([]); // Holds final file blob
     const [fileReady, setFileReady] = useState(false); // Indicates file is ready to download
     const [fileMetadata, setFileMetadata] = useState({ name: "", size: 0 }); // File name, size, type
+    const [transferProgress, setTransferProgress] = useState(0);
 
     // Initiate WebRTC connection on component mount
     useEffect(() => {
@@ -39,17 +40,24 @@ const ReceiveFilePage = () => {
     
             console.log("Receiver is waiting for file from:", senderUsername);
     
-            startWebRTC("receiver", receiverUsername, senderUsername, ({ decryptedBuffer, metadata }) => {
-                const finalBlob = new Blob([decryptedBuffer], { type: metadata.type || "application/octet-stream" });
-                setReceivedChunks([finalBlob]);
-                setFileMetadata({
-                    name: metadata.filename,
-                    size: metadata.totalSize,
-                    type: metadata.type || "application/octet-stream",
-                });
-                setFileReady(true);
-                
-            });
+            startWebRTC(
+                "receiver",
+                receiverUsername,
+                senderUsername,
+                ({ decryptedBuffer, metadata }) => {
+                    const finalBlob = new Blob([decryptedBuffer], { type: metadata.type || "application/octet-stream" });
+                    setReceivedChunks([finalBlob]);
+                    setFileMetadata({
+                        name: metadata.filename,
+                        size: metadata.totalSize,
+                        type: metadata.type || "application/octet-stream",
+                    });
+                    setFileReady(true);
+                },
+                null, // לא צריך onChannelOpen
+                null, // לא צריך onTransferComplete
+                (percent) => setTransferProgress(percent) // ← כאן אתה מוסיף את זה
+            );
         };
 
         validateAndStart();
@@ -124,15 +132,30 @@ const ReceiveFilePage = () => {
     return (
         <TokenWrapper>
             <div className="receive-file-page">
-                {/* Navigation bar with home link and user info */}
                 <Navbar buttons={[{ label: "Home", path: "/home" }]} showUsername={true} />
 
                 <div className="receive-file-container">
                     <h1>Receive a File</h1>
 
-                    {/* Show progress or file details based on status */}
                     {!fileReady ? (
-                        <p>{receivedChunks.length > 0 ? "Receiving file..." : "Waiting for file transfer..."}</p>
+                        <>
+                            <p>
+                                {receivedChunks.length > 0
+                                    ? "Receiving file..."
+                                    : "Waiting for file transfer..."}
+                            </p>
+                            <div className="progress-bar-wrapper">
+                                <div
+                                    className="progress-bar"
+                                    style={{
+                                        width: `${transferProgress}%`,
+                                        height: "10px",
+                                        backgroundColor: "#4caf50",
+                                    }}
+                                />
+                                <p>{transferProgress}%</p>
+                            </div>
+                        </>
                     ) : (
                         <>
                             <p><strong>File received successfully!</strong></p>

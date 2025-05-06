@@ -164,6 +164,9 @@ const SendFilePage = () => {
                         Start Transfer
                     </button>
 
+                    <p>{transferProgress}%</p>
+
+
                     {/* Progress bar and percent */}
                     {isTransferring && (
                         <div className="progress-bar-wrapper">

@@ -19,6 +19,7 @@ let stompClient;
 let onDataChannelOpen = () => { };
 let onDataReceivedCallback = () => { };
 let onTransferCompleteCallback = () => { };
+let onProgressReceiverCallback = () => {};
 let isStompConnected = false; // Track STOMP connection status
 let receivedChunks = [];
 let receivedMetadata = null;
@@ -30,7 +31,8 @@ export const startWebRTC = (
     peerUsername,
     onDataReceived,
     onChannelOpenCallback,
-    onTransferComplete
+    onTransferComplete,
+    onProgressReceiver
 ) => {
     onDataReceivedCallback = onDataReceived;
     if (onTransferComplete) {
@@ -38,6 +40,9 @@ export const startWebRTC = (
     }
     if (onChannelOpenCallback) {
         onDataChannelOpen = onChannelOpenCallback;
+    }
+    if (onProgressReceiver) {
+        onProgressReceiverCallback = onProgressReceiver;
     }
     // Initialize STOMP client
     console.log(`WebRTC Role: ${role}, Peer: ${peerUsername}`);
@@ -213,10 +218,18 @@ const initializePeerConnection = (role, peerUsername, username) => {
                     console.log("Receiver: Received DataChunk!");
                     receivedChunks.push(event.data);
 
+                    // מחשב גודל כולל שהתקבל
                     const receivedSize = receivedChunks.reduce(
                         (acc, chunk) => acc + chunk.size,
                         0
                     );
+                    
+                    // עדכון progress
+                    if (receivedMetadata && onProgressReceiverCallback) {
+                        const percent = Math.floor((receivedSize / receivedMetadata.totalSize) * 100);
+                        onProgressReceiverCallback(percent);
+                    }
+                    
                     if (receivedMetadata && receivedSize >= receivedMetadata.totalSize) {
                         const encryptedBlob = new Blob(receivedChunks);
                         const arrayBuffer = await encryptedBlob.arrayBuffer();
@@ -355,20 +368,13 @@ export const sendFile = async (file, recipientPublicKeyPem, onProgress) => {
     const aesKey = await generateAESKey();
     const iv = window.crypto.getRandomValues(new Uint8Array(12));
     const encrypted = await encryptFile(fileBuffer, aesKey, iv);
-    const encryptedAESKey = await encryptAESKeyWithPublicKey(
-        aesKey,
-        recipientPublicKeyPem
-    );
+    const encryptedAESKey = await encryptAESKeyWithPublicKey(aesKey, recipientPublicKeyPem);
 
     console.log(`Sending file: ${file.name}`);
 
     const hashBuffer = await crypto.subtle.digest("SHA-256", encrypted);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
 
-    // Send metadata to the receiver
-    // This includes the filename, IV, encrypted AES key, total size, and SHA-256 hash
-    // The metadata is sent as a JSON object
-    // The receiver will use this metadata to decrypt the file
     const metadata = {
         filename: file.name,
         iv: Array.from(iv),
@@ -378,28 +384,34 @@ export const sendFile = async (file, recipientPublicKeyPem, onProgress) => {
     };
     dataChannel.send(JSON.stringify({ type: "metadata", metadata }));
 
-    // Send the encrypted file in chunks
-    // The chunk size is set to 16KB (16384 bytes)
-    // This allows for efficient transfer of large files
-    // The progress of the transfer is reported using the onProgress callback
+    const encryptedUint8 = new Uint8Array(encrypted);
+    const totalSize = encryptedUint8.byteLength;
     const chunkSize = 16384;
     let offset = 0;
-    while (offset < encrypted.byteLength) {
-        const chunk = encrypted.slice(offset, offset + chunkSize);
+    let chunkCounter = 0;
+
+    // חישוב דינמי כמה צ'אנקים לדלג בין עדכונים, מ־50 עד 500 צ'אנקים
+    const totalChunks = Math.ceil(totalSize / chunkSize);
+    const updateFrequency = Math.max(50, Math.floor(totalChunks / 100));
+
+    while (offset < totalSize) {
+        const chunk = encryptedUint8.slice(offset, offset + chunkSize);
         dataChannel.send(chunk);
         offset += chunkSize;
+        chunkCounter++;
 
-        if (onProgress) {
-            const percent = Math.min(
-                100,
-                Math.floor((offset / encrypted.byteLength) * 100)
-            );
+        if (onProgress && chunkCounter % updateFrequency === 0) {
+            const percent = Math.floor((offset / totalSize) * 100);
             onProgress(percent);
+            await new Promise((resolve) => setTimeout(resolve, 0));
         }
     }
 
+    if (onProgress) onProgress(100);
     console.log("File sent successfully.");
 };
+
+
 
 export const closeWebRTCConnection = () => {
     try {

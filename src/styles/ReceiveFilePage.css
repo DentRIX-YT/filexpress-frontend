@@ -2,79 +2,98 @@
 
 /* General Layout */
 .receive-file-page {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 100vh;
-    margin: 0;
-    padding: 0;
-    background: linear-gradient(135deg, #f7f7f7, #dae1e7, #e7f7ff);
-    background-size: 200% 200%;
-    animation: backgroundShift 8s infinite alternate ease-in-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(135deg, #f7f7f7, #dae1e7, #e7f7ff);
+  background-size: 200% 200%;
+  animation: backgroundShift 8s infinite alternate ease-in-out;
+}
+
+/* Main Content Container */
+.receive-file-container {
+  background-color: white;
+  padding: 30px;
+  margin-top: 40px;
+  border-radius: 16px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  animation: fadeInUp 1s ease-in-out;
+  width: 90%;
+  max-width: 700px;
+}
+
+/* Title Styling */
+.receive-file-container h1 {
+  font-size: 3rem;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+/* Status Message Styling */
+.receive-file-container p {
+  font-size: 1.3rem;
+  color: #555;
+  line-height: 1.4;
+  margin-bottom: 30px;
+}
+
+/* Save Button */
+.receive-file-container button {
+  font-size: 1.2rem;
+  background-color: #daa520;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.receive-file-container button:hover {
+  background-color: #b8860b;
+}
+
+/* Progress Bar Styling */
+.progress-bar-wrapper {
+  margin-top: 20px;
+}
+
+.progress-bar {
+  background-color: #4caf50;
+  height: 10px;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-bar-wrapper p {
+  margin-top: 5px;
+  font-size: 1rem;
+  color: #333;
+}
+
+/* Animations */
+@keyframes backgroundShift {
+  0% {
+    background-position: 0% 50%;
   }
-  
-  /* Main Content Container */
-  .receive-file-container {
-    background-color: white;
-    padding: 30px;
-    margin-top: 40px;
-    border-radius: 16px;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
-    text-align: center;
-    animation: fadeInUp 1s ease-in-out;
-    width: 90%;
-    max-width: 700px;
+
+  100% {
+    background-position: 100% 50%;
   }
-  
-  /* Title Styling */
-  .receive-file-container h1 {
-    font-size: 3rem;
-    color: #333;
-    margin-bottom: 20px;
+}
+
+@keyframes fadeInUp {
+  from {
+    transform: translateY(30%);
+    opacity: 0;
   }
-  
-  /* Status Message Styling */
-  .receive-file-container p {
-    font-size: 1.3rem;
-    color: #555;
-    line-height: 1.4;
-    margin-bottom: 30px;
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
   }
-  
-  /* Save Button */
-  .receive-file-container button {
-    font-size: 1.2rem;
-    background-color: #DAA520;
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
-  
-  .receive-file-container button:hover {
-    background-color: #B8860B;
-  }
-  
-  /* Animations */
-  @keyframes backgroundShift {
-    0% {
-      background-position: 0% 50%;
-    }
-    100% {
-      background-position: 100% 50%;
-    }
-  }
-  
-  @keyframes fadeInUp {
-    from {
-      transform: translateY(30%);
-      opacity: 0;
-    }
-    to {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
-  
+}

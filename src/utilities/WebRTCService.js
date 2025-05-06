@@ -2,25 +2,45 @@
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { openDB } from "idb";
-import { generateAESKey, encryptFile, decryptFile, encryptAESKeyWithPublicKey, decryptAESKeyWithPrivateKey } from "../utilities/EncryptionUtilss.js";
+import {
+    generateAESKey,
+    encryptFile,
+    decryptFile,
+    encryptAESKeyWithPublicKey,
+    decryptAESKeyWithPrivateKey,
+} from "../utilities/EncryptionUtilss.js";
 
-
+// This file handles WebRTC connections and file transfers between users.
+// It uses STOMP over WebSocket for signaling and IDB for local storage.
+// The WebRTC connection is established based on the role (sender/receiver) and the peer's username.
 let peerConnection;
 let dataChannel;
 let stompClient;
 let onDataChannelOpen = () => { };
 let onDataReceivedCallback = () => { };
+let onTransferCompleteCallback = () => { };
 let isStompConnected = false; // Track STOMP connection status
 let receivedChunks = [];
 let receivedMetadata = null;
 
-export const startWebRTC = (role, username, peerUsername, onDataReceived, onChannelOpenCallback) => {
+// Function to start WebRTC connection
+export const startWebRTC = (
+    role,
+    username,
+    peerUsername,
+    onDataReceived,
+    onChannelOpenCallback,
+    onTransferComplete
+) => {
     onDataReceivedCallback = onDataReceived;
+    if (onTransferComplete) {
+        onTransferCompleteCallback = onTransferComplete;
+    }
     if (onChannelOpenCallback) {
         onDataChannelOpen = onChannelOpenCallback;
     }
-
-    console.log(`🔗 WebRTC Role: ${role}, Peer: ${peerUsername}`);
+    // Initialize STOMP client
+    console.log(`WebRTC Role: ${role}, Peer: ${peerUsername}`);
 
     const socket = new SockJS("http://localhost:8080/webrtc-signaling");
     stompClient = new Client({
@@ -29,15 +49,18 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived, onChan
         reconnectDelay: 5000,
     });
 
+    // Connect to STOMP server
     stompClient.onConnect = () => {
-        console.log("✅ Connected to WebSocket signaling server.");
+        console.log("Connected to WebSocket signaling server.");
         isStompConnected = true;
 
         stompClient.subscribe("/topic/signaling", (message) => {
             const data = JSON.parse(message.body);
-            console.log("📩 Received signaling message:", data);
+            console.log("Received signaling message:", data);
             // Debug: output the intended recipient and local username
-            console.log(`Received message with "to": "${data.to}"; Local username: "${username}"`);
+            console.log(
+                `Received message with "to": "${data.to}"; Local username: "${username}"`
+            );
 
             if (data.type === "offer") {
                 // Check if the offer message is intended for the current user
@@ -45,9 +68,11 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived, onChan
                     console.log("Offer message not for me, ignoring.");
                     return;
                 }
-                console.log("📡 Applying SDP offer...");
+                console.log("Applying SDP offer...");
                 peerConnection
-                    .setRemoteDescription(new RTCSessionDescription({ type: "offer", sdp: data.sdp }))
+                    .setRemoteDescription(
+                        new RTCSessionDescription({ type: "offer", sdp: data.sdp })
+                    )
                     .then(() => peerConnection.createAnswer())
                     .then((answer) => {
                         peerConnection.setLocalDescription(answer);
@@ -56,8 +81,8 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived, onChan
                             body: JSON.stringify({
                                 type: "answer",
                                 sdp: answer.sdp,
-                                from: username,   // current user sending the answer
-                                to: data.from,    // original sender of the offer
+                                from: username, // current user sending the answer
+                                to: data.from, // original sender of the offer
                             }),
                         });
                     })
@@ -69,11 +94,15 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived, onChan
                     return;
                 }
                 if (peerConnection.remoteDescription) {
-                    console.log("Remote description already set, ignoring duplicate answer.");
+                    console.log(
+                        "Remote description already set, ignoring duplicate answer."
+                    );
                     return;
                 }
-                console.log("📡 Applying SDP answer...");
-                peerConnection.setRemoteDescription(new RTCSessionDescription({ type: "answer", sdp: data.sdp }));
+                console.log("Applying SDP answer...");
+                peerConnection.setRemoteDescription(
+                    new RTCSessionDescription({ type: "answer", sdp: data.sdp })
+                );
             }
         });
     };
@@ -89,12 +118,16 @@ export const startWebRTC = (role, username, peerUsername, onDataReceived, onChan
     }, 100);
 };
 
+// Function to initialize the PeerConnection and DataChannel
+// This function is called after the STOMP connection is established
+// It sets up the ICE candidate handling and DataChannel events
+// Depending on the role (sender/receiver), it creates a DataChannel or waits for one
 const initializePeerConnection = (role, peerUsername, username) => {
     const config = {
         iceServers: [
             { urls: "stun:stun.l.google.com:19302" }, // Public STUN server
             {
-                urls: "turn:global.relay.metered.ca:80",  // Free TURN server
+                urls: "turn:global.relay.metered.ca:80", // Free TURN server
                 username: "0761e8061a1e5890b6aa1b79",
                 credential: "ZJd1um/lC9LIoo9f",
             },
@@ -113,7 +146,9 @@ const initializePeerConnection = (role, peerUsername, username) => {
             const protocol = protocolMatch ? protocolMatch[1] : "unknown";
             const candidateType = typeMatch ? typeMatch[1] : "unknown";
 
-            console.log(`📡 ICE candidate: protocol=${protocol}, type=${candidateType}`);
+            console.log(
+                `📡 ICE candidate: protocol=${protocol}, type=${candidateType}`
+            );
             console.log("📥 Full candidate string:", candidateStr);
         } else {
             console.log("✅ All ICE candidates have been sent.");
@@ -125,40 +160,63 @@ const initializePeerConnection = (role, peerUsername, username) => {
         console.log("ICE connection state:", peerConnection.iceConnectionState);
     };
 
+    //if the role is sender, create a data channel
+    // and send an offer to the receiver
     if (role === "sender") {
-        console.log("📡 Sender: Creating DataChannel...");
+        console.log("Sender: Creating DataChannel...");
         dataChannel = peerConnection.createDataChannel("fileTransfer");
 
         dataChannel.onopen = () => {
-            console.log("✅ Sender: DataChannel Opened!");
+            console.log("Sender: DataChannel Opened!");
             onDataChannelOpen();
         };
 
         dataChannel.onerror = (error) => console.error("DataChannel error:", error);
 
+        dataChannel.onmessage = (event) => {
+            if (typeof event.data === "string") {
+                try {
+                    const parsed = JSON.parse(event.data);
+                    if (parsed.type === "transfer-complete") {
+                        console.log("✅ Transfer confirmed by receiver.");
+                        onTransferCompleteCallback(); // ← קריאה ל-callback
+                    }
+                } catch (e) {
+                    console.error("Invalid message format:", event.data);
+                }
+            }
+        };
+        
+
         createAndSendOffer(peerUsername, username);
+        //if the role is receiver, wait for the data channel to be created
     } else if (role === "receiver") {
-        console.log("🎧 Receiver: Waiting for DataChannel...");
+        console.log("Receiver: Waiting for DataChannel...");
         peerConnection.ondatachannel = (event) => {
             dataChannel = event.channel;
 
             dataChannel.onopen = () => {
-                console.log("✅ Receiver: DataChannel Opened!");
+                console.log("Receiver: DataChannel Opened!");
             };
 
+            // Handle incoming messages
             dataChannel.onmessage = async (event) => {
                 if (typeof event.data === "string") {
                     const parsed = JSON.parse(event.data);
                     if (parsed.type === "metadata") {
                         receivedMetadata = parsed.metadata;
                         receivedChunks = [];
-                        console.log("📩 Received metadata:", receivedMetadata);
+                        console.log("Received metadata:", receivedMetadata);
                     }
                 } else {
-                    console.log("📩 Receiver: Received DataChunk!");
+                    // Handle binary data (file chunks)
+                    console.log("Receiver: Received DataChunk!");
                     receivedChunks.push(event.data);
 
-                    const receivedSize = receivedChunks.reduce((acc, chunk) => acc + chunk.size, 0);
+                    const receivedSize = receivedChunks.reduce(
+                        (acc, chunk) => acc + chunk.size,
+                        0
+                    );
                     if (receivedMetadata && receivedSize >= receivedMetadata.totalSize) {
                         const encryptedBlob = new Blob(receivedChunks);
                         const arrayBuffer = await encryptedBlob.arrayBuffer();
@@ -166,24 +224,47 @@ const initializePeerConnection = (role, peerUsername, username) => {
                         const db = await openDB("filexpressDB", 1);
                         const privateKeyPem = await db.get("keys", "privateKey");
 
+                        // Check if privateKeyPem is null
+                        if (!privateKeyPem) {
+                            console.error("Private key not found in IndexedDB.");
+                            alert("File transfer failed: Private key not found.");
+                            return;
+                        }
+                        // Decrypt the AES key using the private key
+                        // and the encrypted AES key received in the metadata
                         const decryptedAESKey = await decryptAESKeyWithPrivateKey(
                             new Uint8Array(receivedMetadata.encryptedAESKey),
                             privateKeyPem
                         );
 
-                        const aesKeyBytes = typeof decryptedAESKey === "string"
-                            ? new TextEncoder().encode(decryptedAESKey)
-                            : decryptedAESKey;
+                        // Check if decryptedAESKey is null
+                        if (!decryptedAESKey) {
+                            console.error("Failed to decrypt AES key.");
+                            alert("File transfer failed: Unable to decrypt AES key.");
+                            return;
+                        }
+                        const aesKeyBytes =
+                            typeof decryptedAESKey === "string"
+                                ? new TextEncoder().encode(decryptedAESKey)
+                                : decryptedAESKey;
 
-                        const encryptedBuffer = await encryptedBlob.arrayBuffer(); // ממיר Blob ל־ArrayBuffer
-                        const receivedHashBuffer = await crypto.subtle.digest("SHA-256", encryptedBuffer);
-                        const receivedHashArray = Array.from(new Uint8Array(receivedHashBuffer));
-
+                        // Verify the file integrity using SHA-256 hash
+                        // Calculate the hash of the received file
+                        // and compare it with the hash in the metadata
+                        const receivedHashBuffer = await crypto.subtle.digest(
+                            "SHA-256",
+                            arrayBuffer
+                        );
+                        const receivedHashArray = Array.from(
+                            new Uint8Array(receivedHashBuffer)
+                        );
                         const originalHash = receivedMetadata.sha256;
-                        const hashesMatch = JSON.stringify(receivedHashArray) === JSON.stringify(originalHash);
+                        const hashesMatch =
+                            JSON.stringify(receivedHashArray) ===
+                            JSON.stringify(originalHash);
 
                         if (!hashesMatch) {
-                            console.error("❌ File hash mismatch – file corrupted or tampered!");
+                            console.error("File hash mismatch – file corrupted or tampered!");
                             alert("File transfer failed due to hash mismatch.");
                             return;
                         }
@@ -194,34 +275,37 @@ const initializePeerConnection = (role, peerUsername, username) => {
                             new Uint8Array(receivedMetadata.iv)
                         );
 
-                        const finalBlob = new Blob([decryptedBuffer]);
-                        const link = document.createElement("a");
-                        link.href = URL.createObjectURL(finalBlob);
-                        link.download = receivedMetadata.filename;
-                        link.click();
+                        onDataReceivedCallback({
+                            decryptedBuffer,
+                            metadata: receivedMetadata,
+                        });
 
-                        console.log("💾 File saved successfully.");
+                        // Signal to sender that the transfer is complete
+                        dataChannel.send(JSON.stringify({ type: "transfer-complete" }));
                     }
                 }
             };
 
-            dataChannel.onerror = (error) => console.error("DataChannel error:", error);
+            dataChannel.onerror = (error) =>
+                console.error("DataChannel error:", error);
         };
     }
 };
 
+// Function to create and send an SDP offer
+// This function is called by the sender after creating the DataChannel
 const createAndSendOffer = async (peerUsername, username) => {
     if (!isStompConnected) {
-        console.error("❌ STOMP is not connected yet, retrying...");
+        console.error("STOMP is not connected yet, retrying...");
         setTimeout(() => createAndSendOffer(peerUsername, username), 500);
         return;
     }
-
+    // Create an SDP offer and set it as the local description
     try {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
-        console.log("⏳ Waiting for ICE gathering to complete...");
+        console.log("Waiting for ICE gathering to complete...");
 
         // Wait until ICE gathering is complete
         const waitForIceGathering = new Promise((resolve) => {
@@ -230,7 +314,10 @@ const createAndSendOffer = async (peerUsername, username) => {
             } else {
                 const checkState = () => {
                     if (peerConnection.iceGatheringState === "complete") {
-                        peerConnection.removeEventListener("icegatheringstatechange", checkState);
+                        peerConnection.removeEventListener(
+                            "icegatheringstatechange",
+                            checkState
+                        );
                         resolve();
                     }
                 };
@@ -238,9 +325,10 @@ const createAndSendOffer = async (peerUsername, username) => {
             }
         });
 
+        // Wait for ICE gathering to complete
         await waitForIceGathering;
 
-        console.log("📡 Sending SDP Offer...");
+        console.log("Sending SDP Offer...");
         stompClient.publish({
             destination: "/app/signal",
             body: JSON.stringify({
@@ -255,40 +343,85 @@ const createAndSendOffer = async (peerUsername, username) => {
     }
 };
 
-export const sendFile = async (file, recipientPublicKeyPem) => {
+// function to send a file over the DataChannel
+// This function encrypts the file using AES encryption
+export const sendFile = async (file, recipientPublicKeyPem, onProgress) => {
     if (!dataChannel || dataChannel.readyState !== "open") {
-        console.error("❌ DataChannel is not open yet.");
+        console.error("DataChannel is not open yet.");
         return;
     }
 
     const fileBuffer = await file.arrayBuffer();
     const aesKey = await generateAESKey();
-    const iv = window.crypto.getRandomValues(new Uint8Array(12)); // או 16, אבל 12 זה מומלץ ל־AES-GCM
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
     const encrypted = await encryptFile(fileBuffer, aesKey, iv);
-    const encryptedAESKey = await encryptAESKeyWithPublicKey(aesKey, recipientPublicKeyPem);
+    const encryptedAESKey = await encryptAESKeyWithPublicKey(
+        aesKey,
+        recipientPublicKeyPem
+    );
 
-    console.log(`📤 Sending file: ${file.name}`);
+    console.log(`Sending file: ${file.name}`);
 
     const hashBuffer = await crypto.subtle.digest("SHA-256", encrypted);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
 
+    // Send metadata to the receiver
+    // This includes the filename, IV, encrypted AES key, total size, and SHA-256 hash
+    // The metadata is sent as a JSON object
+    // The receiver will use this metadata to decrypt the file
     const metadata = {
         filename: file.name,
         iv: Array.from(iv),
         encryptedAESKey: Array.from(new Uint8Array(encryptedAESKey)),
         totalSize: encrypted.byteLength,
-        sha256: hashArray
+        sha256: hashArray,
     };
     dataChannel.send(JSON.stringify({ type: "metadata", metadata }));
 
+    // Send the encrypted file in chunks
+    // The chunk size is set to 16KB (16384 bytes)
+    // This allows for efficient transfer of large files
+    // The progress of the transfer is reported using the onProgress callback
     const chunkSize = 16384;
     let offset = 0;
-
     while (offset < encrypted.byteLength) {
         const chunk = encrypted.slice(offset, offset + chunkSize);
         dataChannel.send(chunk);
         offset += chunkSize;
+
+        if (onProgress) {
+            const percent = Math.min(
+                100,
+                Math.floor((offset / encrypted.byteLength) * 100)
+            );
+            onProgress(percent);
+        }
     }
 
-    console.log("✅ File sent successfully.");
+    console.log("File sent successfully.");
+};
+
+export const closeWebRTCConnection = () => {
+    try {
+        if (dataChannel) {
+            dataChannel.close();
+            dataChannel = null;
+        }
+        if (peerConnection) {
+            peerConnection.getSenders().forEach((sender) => {
+                if (sender.track) sender.track.stop();
+            });
+            peerConnection.close();
+            peerConnection = null;
+        }
+        if (stompClient && stompClient.connected) {
+            stompClient.deactivate();
+            stompClient = null;
+        }
+        receivedChunks = [];
+        receivedMetadata = null;
+        console.log("WebRTC connection and resources cleaned up.");
+    } catch (err) {
+        console.error("Error while closing WebRTC connection:", err);
+    }
 };

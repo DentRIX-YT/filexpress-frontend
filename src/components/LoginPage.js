@@ -1,17 +1,21 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "../styles/LoginPage.css";
-import PassphraseSetup from "./PassphraseSetup";
+import "../styles/LoginPage.css"; // Styling for login and signup
+import PassphraseSetup from "./PassphraseSetup"; // Component for setting a passphrase for new users
 
 const LoginPage = () => {
+  // Toggle between login and signup views
   const [isSignUp, setIsSignUp] = useState(false);
   const [error, setError] = useState(null);
 
+  // Determines whether the user needs to set a passphrase
   const [isNewUser, setIsNewUser] = useState(false);
 
+  // Login form state
   const [loginUsername, setLoginUsername] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
 
+  // Signup form state
   const [signUpEmail, setSignUpEmail] = useState("");
   const [signUpUsername, setSignUpUsername] = useState("");
   const [signUpPassword, setSignUpPassword] = useState("");
@@ -19,6 +23,7 @@ const LoginPage = () => {
 
   const navigate = useNavigate();
 
+  // Handles user login
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
@@ -30,10 +35,14 @@ const LoginPage = () => {
           password: loginPassword,
         }),
       });
+
       if (!response.ok) {
         throw new Error("Failed to log in");
       }
+
       const data = await response.json();
+
+      // Store tokens and roles in session
       sessionStorage.setItem("accessToken", data.accessToken);
       sessionStorage.setItem("refreshToken", data.refreshToken);
       sessionStorage.setItem("userRole", data.roles);
@@ -41,12 +50,11 @@ const LoginPage = () => {
 
       if (data.privateKeyExists === false) {
         setIsNewUser(true);
-        sessionStorage.setItem("isNewUser", isNewUser); // Backend should provide this info
+        sessionStorage.setItem("isNewUser", isNewUser); // Optional: backend should ideally send this
       } else {
-        // Clear the login input fields
+        // Clear login inputs and redirect to home
         setLoginUsername("");
         setLoginPassword("");
-
         navigate("/home");
       }
     } catch (err) {
@@ -54,6 +62,7 @@ const LoginPage = () => {
     }
   };
 
+  // Handles user registration
   const handleSignUp = async (e) => {
     e.preventDefault();
     try {
@@ -62,7 +71,7 @@ const LoginPage = () => {
         username: signUpUsername,
         password: signUpPassword,
         dateOfBirth: signUpDOB,
-        roles: ["ROLE_USER"], // Default role for new users
+        roles: ["ROLE_USER"], // Default role assigned on signup
       };
 
       const response = await fetch("http://localhost:8080/users", {
@@ -78,32 +87,33 @@ const LoginPage = () => {
       }
 
       const data = await response.json();
+
+      // Store tokens and roles in session
       sessionStorage.setItem("accessToken", data.accessToken);
       sessionStorage.setItem("refreshToken", data.refreshToken);
       sessionStorage.setItem("userRole", data.roles);
 
-      // Clear the signup input fields
+      // Clear signup form
       setSignUpEmail("");
       setSignUpUsername("");
       setSignUpPassword("");
       setSignUpDOB("");
 
+      // Switch to login mode
       setIsSignUp(false);
     } catch (err) {
       setError("Sign up failed. Please try again.");
     }
   };
 
+  // Encrypts private key using AES-GCM and a passphrase
   const encryptPrivateKey = async (privateKeyBase64, passphrase) => {
     try {
-      // Encode the passphrase
       const encoder = new TextEncoder();
       const passphraseKey = encoder.encode(passphrase);
-
-      // Generate a random salt
       const salt = window.crypto.getRandomValues(new Uint8Array(16));
 
-      // Derive AES key using PBKDF2
+      // Derive encryption key using PBKDF2
       const keyMaterial = await window.crypto.subtle.importKey(
         "raw",
         passphraseKey,
@@ -125,33 +135,32 @@ const LoginPage = () => {
         ["encrypt"]
       );
 
-      // Generate a random IV (Initialization Vector)
       const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
-      // Encrypt the private key
       const encrypted = await window.crypto.subtle.encrypt(
         { name: "AES-GCM", iv: iv },
         aesKey,
         encoder.encode(privateKeyBase64)
       );
 
-      // Convert all parts to Base64 for storage
+      // Encode all parts in Base64
       const encryptedBase64 = btoa(
         String.fromCharCode(...new Uint8Array(encrypted))
       );
       const ivBase64 = btoa(String.fromCharCode(...iv));
       const saltBase64 = btoa(String.fromCharCode(...salt));
 
-      return `${saltBase64}:${ivBase64}:${encryptedBase64}`; // Format: salt:iv:encryptedData
+      return `${saltBase64}:${ivBase64}:${encryptedBase64}`;
     } catch (error) {
       console.error("Encryption error:", error);
       return null;
     }
   };
 
+  // Called after user submits a passphrase for first-time key setup
   const handlePassphraseSubmit = async (passphrase) => {
     try {
-      // 1. Generate RSA Key Pair
+      // Generate RSA key pair
       const keyPair = await window.crypto.subtle.generateKey(
         {
           name: "RSA-OAEP",
@@ -163,7 +172,7 @@ const LoginPage = () => {
         ["encrypt", "decrypt"]
       );
 
-      // 2. Export Keys
+      // Export keys to Base64
       const publicKey = await window.crypto.subtle.exportKey(
         "spki",
         keyPair.publicKey
@@ -173,7 +182,6 @@ const LoginPage = () => {
         keyPair.privateKey
       );
 
-      // 3. Convert to Base64 Strings
       const publicKeyBase64 = btoa(
         String.fromCharCode(...new Uint8Array(publicKey))
       );
@@ -181,13 +189,13 @@ const LoginPage = () => {
         String.fromCharCode(...new Uint8Array(privateKey))
       );
 
-      // 4. Encrypt the Private Key with the Passphrase (Fixed AES-GCM)
+      // Encrypt private key using the user's passphrase
       const encryptedKey = await encryptPrivateKey(
         privateKeyBase64,
         passphrase
       );
 
-      // 5. Save Public Key to Backend
+      // Upload public key to server
       await fetch("http://localhost:8080/api/public-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -197,17 +205,17 @@ const LoginPage = () => {
         }),
       });
 
-      // 6. Save Encrypted Private Key to Backend
+      // Upload encrypted private key to server
       await fetch("http://localhost:8080/api/private-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: loginUsername,
-          encryptedPrivateKey: encryptedKey, // Now includes salt, IV, and encrypted data
+          encryptedPrivateKey: encryptedKey,
         }),
       });
 
-      // 7. Mark User as Not New and Navigate to Home
+      // Proceed to home page
       setIsNewUser(false);
       navigate("/home");
     } catch (error) {
@@ -218,11 +226,13 @@ const LoginPage = () => {
 
   return (
     <div>
+      {/* Render passphrase setup for new users */}
       {isNewUser ? (
         <PassphraseSetup onPassphraseSubmit={handlePassphraseSubmit} />
       ) : (
         <div className="login-page">
           <div className={`login-content ${isSignUp ? "sign-up-mode" : ""}`}>
+            {/* Login Form */}
             <div className="form-container login-form">
               <div className="logo-container">
                 <img
@@ -267,6 +277,8 @@ const LoginPage = () => {
                 </p>
               </form>
             </div>
+
+            {/* Signup Form */}
             {isSignUp && (
               <div className="signup-form">
                 <div className="large-logo-container">

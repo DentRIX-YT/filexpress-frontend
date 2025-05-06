@@ -1,24 +1,29 @@
 import React, { useState, useEffect } from "react";
-import { openDB } from "idb";
+import { openDB } from "idb"; // IndexedDB wrapper for storing decrypted private keys
+import { decryptAndStorePrivateKey } from "../utilities/EncryptionUtilss";
 import "../styles/HandshakePage.css";
-import TokenWrapper from "../utilities/TokenWrapper";
+import TokenWrapper from "../utilities/TokenWrapper"; // Auth wrapper component
 import { useNavigate } from "react-router-dom";
-import Navbar from "./Navbar";
+import Navbar from "./Navbar"; // Top navigation bar component
 
 const HandshakePage = () => {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("Loading...");
-  const [role, setRole] = useState(null);
-  const [handshakeCode, setHandshakeCode] = useState("");
-  const [receiverCode, setReceiverCode] = useState("");
-  const [passphrase, setPassphrase] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
-  const [animationClass, setAnimationClass] = useState("");
 
+  // State variables
+  const [username, setUsername] = useState("Loading...");
+  const [role, setRole] = useState(null); // Either 'sender' or 'receiver'
+  const [handshakeCode, setHandshakeCode] = useState(""); // 6-digit code for sender
+  const [receiverCode, setReceiverCode] = useState(""); // Code entered by receiver
+  const [passphrase, setPassphrase] = useState(""); // Passphrase for decrypting private key
+  const [statusMessage, setStatusMessage] = useState(""); // UI message to show status
+  const [animationClass, setAnimationClass] = useState(""); // For fade-in animation
+
+  // Buttons to be passed to the Navbar
   const handshakeButtons = [
     { label: "View Old Files", path: "/view-old-files" },
   ];
 
+  // Fetch username on component mount
   useEffect(() => {
     const fetchUsername = async () => {
       const accessToken = sessionStorage.getItem("accessToken");
@@ -49,6 +54,7 @@ const HandshakePage = () => {
       }
     };
 
+    // Slight delay to ensure component renders smoothly
     const timer = setTimeout(() => {
       fetchUsername();
     }, 150);
@@ -56,9 +62,11 @@ const HandshakePage = () => {
     return () => clearTimeout(timer);
   }, [navigate]);
 
+  // Generates a random 6-digit handshake code
   const generateHandshakeCode = () =>
     Math.floor(100000 + Math.random() * 900000).toString();
 
+  // Handler for selecting "Sender" role
   const handleSenderSelect = async () => {
     setRole("sender");
     const newHandshakeCode = generateHandshakeCode();
@@ -77,25 +85,26 @@ const HandshakePage = () => {
       const data = await response.json();
       if (data.handshakeCode === newHandshakeCode) {
         setAnimationClass("fade-in");
-  
+
+        // Polling backend every 3 seconds for handshake completion status
         const intervalId = setInterval(async () => {
           const statusResponse = await fetch(
             `http://localhost:8080/handshake/status/${username}`
           );
           const statusData = await statusResponse.json();
-  
+
           if (statusData.status === "completed") {
             clearInterval(intervalId);
             sessionStorage.setItem("handshakeAuthenticated", "true");
-  
+
             setStatusMessage("Handshake completed! Redirecting...");
             setTimeout(() => {
               navigate("/send-file", {
                 state: {
                   role: "sender",
-                  receiverUsername: statusData.receiverUsername, // Fetch from backend
+                  receiverUsername: statusData.receiverUsername,
                   senderUsername: username,
-                  receiverPublicKey: statusData.receiverPublicKey, // Fetch from backend
+                  receiverPublicKey: statusData.receiverPublicKey,
                 },
               });
             }, 2000);
@@ -107,11 +116,13 @@ const HandshakePage = () => {
     }
   };
 
+  // Handler for selecting "Receiver" role
   const handleReceiverSelect = () => {
     setRole("receiver");
     setAnimationClass("fade-in");
   };
 
+  // Submit handler for the receiver's form
   const handleReceiverSubmit = async () => {
     if (receiverCode.length !== 6) {
       setStatusMessage("Handshake code must be 6 digits.");
@@ -121,6 +132,7 @@ const HandshakePage = () => {
       setStatusMessage("Passphrase must be at least 6 characters.");
       return;
     }
+
     try {
       const response = await fetch("http://localhost:8080/handshake/validate", {
         method: "POST",
@@ -137,7 +149,6 @@ const HandshakePage = () => {
 
       if (response.ok) {
         if (data.status === "success") {
-          
           handleHandshakeSuccess(data.encryptedPrivateKey, passphrase, data.senderUsername);
         } else {
           setStatusMessage("Unexpected response. Please try again.");
@@ -146,114 +157,40 @@ const HandshakePage = () => {
         if (data.status === "failed-passphrase") {
           setStatusMessage("Invalid passphrase. Please check and try again.");
         } else if (data.status === "failed") {
-          setStatusMessage(
-            "Invalid handshake code. Please check and try again."
-          );
+          setStatusMessage("Invalid handshake code. Please check and try again.");
         } else {
           setStatusMessage("An unknown error occurred. Please try again.");
         }
       }
     } catch (error) {
       console.error("Error validating handshake:", error);
-      setStatusMessage(
-        "A network error occurred. Check your connection and try again."
-      );
+      setStatusMessage("A network error occurred. Check your connection and try again.");
     }
   };
 
-  const decryptPrivateKey = async (encryptedKey, passphrase) => {
-    try {
-      // Split salt, IV, and encrypted data
-      const [saltBase64, ivBase64, encryptedBase64] = encryptedKey.split(":");
 
-      const salt = new Uint8Array(
-        atob(saltBase64)
-          .split("")
-          .map((c) => c.charCodeAt(0))
-      );
-      const iv = new Uint8Array(
-        atob(ivBase64)
-          .split("")
-          .map((c) => c.charCodeAt(0))
-      );
-      const encryptedData = new Uint8Array(
-        atob(encryptedBase64)
-          .split("")
-          .map((c) => c.charCodeAt(0))
-      );
-
-      const encoder = new TextEncoder();
-      const passphraseKey = encoder.encode(passphrase);
-
-      // Derive AES key using PBKDF2
-      const keyMaterial = await window.crypto.subtle.importKey(
-        "raw",
-        passphraseKey,
-        { name: "PBKDF2" },
-        false,
-        ["deriveKey"]
-      );
-
-      const aesKey = await window.crypto.subtle.deriveKey(
-        {
-          name: "PBKDF2",
-          salt: salt,
-          iterations: 100000,
-          hash: "SHA-256",
-        },
-        keyMaterial,
-        { name: "AES-GCM", length: 256 },
-        false,
-        ["decrypt"]
-      );
-
-      // Decrypt private key
-      const decryptedBuffer = await window.crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: iv },
-        aesKey,
-        encryptedData
-      );
-
-      const decryptedPrivateKey = new TextDecoder().decode(decryptedBuffer);
-
-      // Store in IndexedDB
-      const db = await openDB("filexpressDB", 1, {
-        upgrade(db) {
-          db.createObjectStore("keys");
-        },
-      });
-
-      await db.put("keys", decryptedPrivateKey, "privateKey");
-
-      console.log("Private key stored temporarily in IndexedDB.");
-
-      return decryptedPrivateKey;
-    } catch (error) {
-      console.error("Decryption error:", error);
-      return null;
-    }
-  };
-
+  // Handles successful handshake after decrypting private key
   const handleHandshakeSuccess = async (encryptedPrivateKey, passphrase, senderUsername) => {
-    const privateKey = await decryptPrivateKey(encryptedPrivateKey, passphrase);
+    const privateKey = await decryptAndStorePrivateKey(encryptedPrivateKey, passphrase);
     if (privateKey) {
-        sessionStorage.setItem("handshakeAuthenticated", "true");
-        setStatusMessage("Handshake successful! Redirecting...");
-        
-        setTimeout(() => {
-            navigate("/receive-file", {
-                state: { 
-                    role: "receiver",
-                    senderUsername: senderUsername, // ✅ Ensure this is correctly passed
-                    receiverUsername: username
-                }
-            });
-        }, 2000);
-    } else {
-        console.error("Failed to decrypt private key.");
-    }
-};
+      sessionStorage.setItem("handshakeAuthenticated", "true");
+      setStatusMessage("Handshake successful! Redirecting...");
 
+      setTimeout(() => {
+        navigate("/receive-file", {
+          state: {
+            role: "receiver",
+            senderUsername: senderUsername,
+            receiverUsername: username,
+          },
+        });
+      }, 2000);
+    } else {
+      console.error("Failed to decrypt private key.");
+    }
+  };
+
+  // JSX rendering
   return (
     <TokenWrapper>
       <div className="handshake-page">

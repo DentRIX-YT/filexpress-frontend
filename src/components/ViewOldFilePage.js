@@ -9,44 +9,74 @@ const ViewOldFilePage = () => {
   const [direction, setDirection] = useState("all");
   const [viewMode, setViewMode] = useState("logs"); // NEW: "logs" or "files"
   const [statusMessage, setStatusMessage] = useState("Loading logs...");
+  const [serverFiles, setServerFiles] = useState([]);
+
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      if (viewMode !== "logs") return;
-      try {
-        const token = sessionStorage.getItem("accessToken");
-        const username = await fetchUsernameFromToken(token);
+    const fetchData = async () => {
+      const token = sessionStorage.getItem("accessToken");
+      const username = await fetchUsernameFromToken(token);
 
-        const response = await fetch("http://localhost:8080/api/logs/query", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            username: username,
-            direction: direction,
-            limit: 100,
-          }),
-        });
+      if (!username || !token) return;
 
-        const rawText = await response.text();
-        const data = JSON.parse(rawText);
+      if (viewMode === "logs") {
+        try {
+          const response = await fetch("http://localhost:8080/api/logs/query", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              username: username,
+              direction: direction,
+              limit: 100,
+            }),
+          });
 
-        if (data.status === "success") {
-          setLogs(data.logs);
-          setStatusMessage("");
-        } else {
-          setStatusMessage("Failed to load logs.");
+          const rawText = await response.text();
+          const data = JSON.parse(rawText);
+
+          if (data.status === "success") {
+            setLogs(data.logs);
+            setStatusMessage("");
+          } else {
+            setStatusMessage("Failed to load logs.");
+          }
+        } catch (error) {
+          console.error("Log fetch error:", error);
+          setStatusMessage("An error occurred while fetching logs.");
         }
-      } catch (error) {
-        console.error("Log fetch error:", error);
-        setStatusMessage("An error occurred while fetching logs.");
+      } else if (viewMode === "files") {
+        try {
+          const response = await fetch(`http://localhost:8080/api/files/${username}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          const rawText = await response.text();
+          const files = JSON.parse(rawText);
+          setServerFiles(files);
+        } catch (error) {
+          console.error("Failed to fetch server files:", error);
+        }
       }
     };
 
-    fetchLogs();
-  }, [direction, viewMode]);
+    fetchData();
+  }, [viewMode, direction]);
+
+  const formatDate = (isoString) => {
+    const date = new Date(isoString);
+    return date.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
   const buttons = [
     { label: "Home", path: "/home" },
@@ -116,9 +146,20 @@ const ViewOldFilePage = () => {
           )}
 
           {viewMode === "files" && (
-            <div className="files-placeholder">
-              <p>📦 This is where stored server-side files will appear (coming soon).</p>
-            </div>
+            <>
+              <h2>Server-Saved Files</h2>
+              <ul className="server-file-list">
+                {serverFiles.length === 0 && <p>No saved files found.</p>}
+                {serverFiles.map((file) => (
+                  <li key={file.id} className="file-item">
+                    <strong>{file.originalFilename}</strong> – Uploaded at:{" "}
+                    <span className="upload-time">{formatDate(file.uploadedAt)}</span> &nbsp;
+                    <button>Download</button> &nbsp;
+                    <button>Delete</button>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
       </div>

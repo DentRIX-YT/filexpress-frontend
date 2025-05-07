@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import "../styles/ViewOldFilePage.css";
 import TokenWrapper from "../utilities/TokenWrapper";
 import { fetchUsernameFromToken } from "../utilities/UsernameUtil";
+import { downloadEncryptedFileViaWebSocket } from "../utilities/WebSocketDownloadService";
+import { decryptAndCachePrivateKey } from "../utilities/EncryptionUtilss";
+import PassphraseModal from "./PassphraseModal";
 import Navbar from "./Navbar";
 
 const ViewOldFilePage = () => {
@@ -10,6 +13,9 @@ const ViewOldFilePage = () => {
   const [viewMode, setViewMode] = useState("logs"); // NEW: "logs" or "files"
   const [statusMessage, setStatusMessage] = useState("Loading logs...");
   const [serverFiles, setServerFiles] = useState([]);
+  const [showPassModal, setShowPassModal] = useState(false);
+  const [selectedFileForDownload, setSelectedFileForDownload] = useState(null);
+  const [downloadStatus, setDownloadStatus] = useState("");
 
 
   useEffect(() => {
@@ -152,14 +158,95 @@ const ViewOldFilePage = () => {
                 {serverFiles.length === 0 && <p>No saved files found.</p>}
                 {serverFiles.map((file) => (
                   <li key={file.id} className="file-item">
-                    <strong>{file.originalFilename}</strong> – Uploaded at:{" "}
+                    <strong>{file.originalFilename}</strong> – Size: {(file.size / (1024 ** 3)).toFixed(2)} GB – Uploaded at:{" "}
                     <span className="upload-time">{formatDate(file.uploadedAt)}</span> &nbsp;
-                    <button>Download</button> &nbsp;
-                    <button>Delete</button>
+                    <button
+                      onClick={() => {
+                        setSelectedFileForDownload(file);
+                        setShowPassModal(true);
+                      }}
+                    >
+                      Download
+                    </button> &nbsp;
+                    <button
+                      onClick={async () => {
+                        const token = sessionStorage.getItem("accessToken");
+                        try {
+                          const res = await fetch(`http://localhost:8080/api/files/delete/${file.id}`, {
+                            method: "DELETE",
+                            headers: {
+                              Authorization: `Bearer ${token}`,
+                            },
+                          });
+
+                          if (res.ok) {
+                            setServerFiles((prev) => prev.filter((f) => f.id !== file.id));
+                          } else {
+                            console.error("Failed to delete file.");
+                          }
+                        } catch (err) {
+                          console.error("Delete error:", err);
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
                   </li>
                 ))}
               </ul>
             </>
+          )}
+          {downloadStatus && (
+            <p className="download-status">{downloadStatus}</p>
+          )}
+          {showPassModal && (
+            <PassphraseModal
+              onClose={() => setShowPassModal(false)}
+              onSubmit={async (passphrase, setError) => {
+                try {
+                  const accessToken = sessionStorage.getItem("accessToken");
+                  const username = await fetchUsernameFromToken();
+
+                  const res = await fetch(`http://localhost:8080/api/private-key/${username}`, {
+                    method: "GET",
+                    headers: {
+                      Authorization: `Bearer ${accessToken}`,
+                    },
+                  });
+
+                  if (!res.ok) {
+                    setError("Failed to retrieve encrypted private key.");
+                    return;
+                  }
+
+                  const data = await res.json();
+                  const encryptedKey = data.encryptedPrivateKey;
+
+                  const privateKey = await decryptAndCachePrivateKey(encryptedKey, passphrase);
+                  if (!privateKey) {
+                    setError("Failed to decrypt private key. Please check your passphrase.");
+                    return;
+                  }
+
+                  if (!selectedFileForDownload?.id) {
+                    setError("No file selected for download.");
+                    return;
+                  }
+
+                  await downloadEncryptedFileViaWebSocket(
+                    selectedFileForDownload,
+                    privateKey,
+                    (progress) => console.log("Download progress:", progress),
+                    setDownloadStatus
+                  );
+
+                  setShowPassModal(false);
+                } catch (err) {
+                  console.error("Error during passphrase verification or file download:", err);
+                  setError("A network error occurred. Please try again.");
+                }
+              }}
+            />
           )}
         </div>
       </div>

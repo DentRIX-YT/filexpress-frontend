@@ -1,0 +1,94 @@
+/* רקע מטושטש + כהה */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    backdrop-filter: blur(5px); /* ✅ מטשטש את הרקע */
+    background-color: rgba(0, 0, 0, 0.4); /* ✅ כהות */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeInOverlay 0.3s ease-in-out forwards;
+  }
+  
+  /* תיבת החלון עם אנימציה */
+  .modal-box {
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(0,0,0,0.3);
+    animation: fadeInModal 0.4s ease-out forwards;
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  
+  /* אנימציית הופעת הרקע */
+  @keyframes fadeInOverlay {
+    from {
+      backdrop-filter: blur(0px);
+      background-color: rgba(0, 0, 0, 0);
+    }
+    to {
+      backdrop-filter: blur(5px);
+      background-color: rgba(0, 0, 0, 0.4);
+    }
+  }
+  
+  /* אנימציית הופעת החלון */
+  @keyframes fadeInModal {
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  /* שאר העיצוב נשאר */
+  .modal-box h2 {
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+  }
+  
+  .modal-box input {
+    width: 100%;
+    padding: 10px;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    margin-bottom: 15px;
+  }
+  
+  .modal-buttons {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  
+  .modal-buttons button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 1rem;
+  }
+  
+  .modal-buttons .cancel {
+    background-color: #ddd;
+  }
+  
+  .modal-buttons button:not(.cancel) {
+    background-color: #333;
+    color: white;
+  }
+  
+  .error-text {
+    color: red;
+    margin-bottom: 10px;
+  }

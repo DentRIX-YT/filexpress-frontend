@@ -62,40 +62,32 @@ export const sendFileViaWebSocket = async (
     }
 };
 
-function sendChunks(socket, encryptedFile, onProgress, onComplete) {
+export const sendChunks = async (socket, encryptedFile, onProgress, onComplete) => {
     const chunkSize = 16384;
     const totalSize = encryptedFile.byteLength;
     const encryptedUint8 = new Uint8Array(encryptedFile);
-    let offset = 0;
-    let chunkCounter = 0;
     const totalChunks = Math.ceil(totalSize / chunkSize);
     const updateFrequency = Math.max(50, Math.floor(totalChunks / 100));
 
-    const sendChunk = () => {
-        if (offset < totalSize) {
-            // const chunk = new Uint8Array([0x48, 0x65, 0x6C, 0x6C, 0x6F]); // Hello
-            // socket.send(chunk);
-            const chunk = encryptedUint8.slice(offset, offset + chunkSize);
-            const buffer = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
-            socket.send(buffer); 
-            offset += chunkSize;
-            chunkCounter++;
+    let offset = 0;
+    let chunkCounter = 0;
 
-            if (onProgress && chunkCounter % updateFrequency === 0) {
-                const percent = Math.floor((offset / totalSize) * 100);
-                onProgress(percent);
-            }
+    while (offset < totalSize) {
+        const chunk = encryptedUint8.slice(offset, offset + chunkSize);
+        const buffer = chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength);
+        socket.send(buffer);
 
-            setTimeout(sendChunk, 0);
-        } else {
-            setTimeout(() => {
-                socket.send(JSON.stringify({ type: "EOF" }));
-                console.log("EOF sent");
-                if (onProgress) onProgress(100);
-                if (onComplete) onComplete();
-            }, 200);
+        offset += chunkSize;
+        chunkCounter++;
+
+        if (onProgress && chunkCounter % updateFrequency === 0) {
+            const percent = Math.floor((offset / totalSize) * 100);
+            onProgress(percent);
         }
-    };
+    }
 
-    sendChunk();
-}
+    socket.send(JSON.stringify({ type: "EOF" }));
+    console.log("EOF sent");
+    if (onProgress) onProgress(100);
+    if (onComplete) onComplete();
+};

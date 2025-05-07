@@ -112,7 +112,7 @@ const ReceiveFilePage = () => {
                     receiverUsername: receiverUsername,
                     filename: fileMetadata.name,
                     method: fileMetadata.method,
-                    storedForLater: fileMetadata.storedForLater || false,
+                    storedForLater: (fileMetadata.method === "CLIENT_TO_CLIENT") ? false : true,
                 }),
             });
     
@@ -127,47 +127,45 @@ const ReceiveFilePage = () => {
         }
     };
     
-    
-    
+    const handleCancel = async () => {
+        closeWebRTCConnection();
+        await deletePrivateKey();
+        await fetch(`http://localhost:8080/webrtc/disconnect?username=${receiverUsername}`, { method: "DELETE" });
+        await fetch(`http://localhost:8080/handshake/remove/${senderUsername}`, { method: "DELETE" });
+        navigate("/home");
+      };
 
     return (
         <TokenWrapper>
-            <div className="receive-file-page">
-                <Navbar buttons={[{ label: "Home", path: "/home" }]} showUsername={true} />
-
-                <div className="receive-file-container">
-                    <h1>Receive a File</h1>
-
-                    {!fileReady ? (
-                        <>
-                            <p>
-                                {receivedChunks.length > 0
-                                    ? "Receiving file..."
-                                    : "Waiting for file transfer..."}
-                            </p>
-                            <div className="progress-bar-wrapper">
-                                <div
-                                    className="progress-bar"
-                                    style={{
-                                        width: `${transferProgress}%`,
-                                        height: "10px",
-                                        backgroundColor: "#4caf50",
-                                    }}
-                                />
-                                <p>{transferProgress}%</p>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <p><strong>File received successfully!</strong></p>
-                            <p><strong>File name:</strong> {fileMetadata.name}</p>
-                            <p><strong>Size:</strong> {(fileMetadata.size / 1024).toFixed(2)} KB</p>
-                            <button onClick={handleSaveFile}>Save File</button>
-                        </>
-                    )}
-                </div>
-            </div>
-        </TokenWrapper>
+      <div className="receive-file-page">
+        <Navbar buttons={[{ label: "Home", path: "/home" }]} showUsername={true} />
+        <div className="receive-file-container">
+          <h1>Receive a File</h1>
+          {!fileReady ? (
+            <>
+              <p>{receivedChunks.length > 0 ? "Receiving file..." : "Waiting for file transfer..."}</p>
+              <div className="progress-bar-wrapper">
+                <div
+                  className="progress-bar"
+                  style={{ width: `${transferProgress}%`, height: "10px", backgroundColor: "#4caf50" }}
+                />
+                <p>{transferProgress}%</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <p><strong>File received successfully!</strong></p>
+              <p><strong>File name:</strong> {fileMetadata.name}</p>
+              <p><strong>Size:</strong> {(fileMetadata.size / 1024).toFixed(2)} KB</p>
+              <div className="button-group">
+                <button onClick={handleSaveFile}>Save File</button>
+                <button onClick={handleCancel}>Cancel</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </TokenWrapper>
     );
 };
 

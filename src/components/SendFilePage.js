@@ -30,18 +30,16 @@ const SendFilePage = () => {
     const [transferMethod, setTransferMethod] = useState("CLIENT_TO_CLIENT");
 
     useEffect(() => {
-        if ((transferMethod === "SERVER_RELAY" ? wsDone
-             : transferMethod === "CLIENT_TO_CLIENT" ? webrtcDone
-             : webrtcDone && wsDone)
-        ) {
-          // שניהם (או האחד הרלוונטי) גמרו:
-          closeWebRTCConnection();
-          // notify backend לשחרור handshake
-          fetch(`http://localhost:8080/webrtc/disconnect?username=${senderUsername}`, {method:"DELETE"});
-          fetch(`http://localhost:8080/handshake/remove/${senderUsername}`,    {method:"DELETE"});
-          navigate("/home");
+        const isClientToClient = transferMethod === "CLIENT_TO_CLIENT";
+        const isClientToBoth = transferMethod === "CLIENT_TO_BOTH";
+
+        if ((isClientToClient && webrtcDone) || (isClientToBoth && webrtcDone && wsDone)) {
+            closeWebRTCConnection();
+            fetch(`http://localhost:8080/webrtc/disconnect?username=${senderUsername}`, { method: "DELETE" });
+            fetch(`http://localhost:8080/handshake/remove/${senderUsername}`, { method: "DELETE" });
+            navigate("/home");
         }
-      }, [webrtcDone, wsDone, transferMethod, senderUsername, navigate]);
+    }, [webrtcDone, wsDone, transferMethod, senderUsername, navigate]);
 
     // Establish WebRTC connection on component mount
     useEffect(() => {
@@ -138,59 +136,42 @@ const SendFilePage = () => {
             return;
         }
 
-        if (transferMethod !== "SERVER_RELAY" && !isDataChannelOpen) {
+        if (!isDataChannelOpen) {
             setStatusMessage("DataChannel is not ready yet. Please wait...");
             return;
         }
 
-        
+
 
         setStatusMessage("Sending file...");
         setIsTransferring(true);
         setTransferProgress(0);
         try {
             // Send file with progress callback
-            if(transferMethod === "CLIENT_TO_CLIENT") {
+            if (transferMethod === "CLIENT_TO_CLIENT") {
                 await sendFile(selectedFile, receiverPublicKey, "CLIENT_TO_CLIENT", (percent) => {
                     setTransferProgress(percent);
                 });
             }
-            else if(transferMethod === "CLIENT_TO_BOTH") {
+            else if (transferMethod === "CLIENT_TO_BOTH") {
                 await sendFile(selectedFile, receiverPublicKey, "CLIENT_TO_BOTH", (percent) => {
-                    setTransferProgress(percent / 2); 
+                    setTransferProgress(percent);
                 });
-    
+
                 await sendFileViaWebSocket(
                     selectedFile,
                     senderUsername,
                     receiverUsername,
                     receiverPublicKey,
-                    (percent) => {
-                        setTransferProgress(50 + percent / 2);
+                    () => {
                     },
                     () => {
                         console.log("WebSocket upload complete.");
                         setWsDone(true);
                     }
                 );
-                
             }
-            else if(transferMethod === "SERVER_RELAY") {
-                await sendFileViaWebSocket(
-                    selectedFile,
-                    senderUsername,
-                    receiverUsername,
-                    receiverPublicKey,
-                    (percent) => {
-                        setTransferProgress(percent);
-                    },
-                    () => {
-                        console.log("WebSocket upload complete.");
-                        setWsDone(true);
-                    }
-                );
-                
-            }
+
             setIsTransferring(false);
             setStatusMessage("File sent successfully!");
 
@@ -236,9 +217,6 @@ const SendFilePage = () => {
                             </option>
                             <option value="CLIENT_TO_BOTH">
                                 Dual: Sender ➝ Receiver + Server
-                            </option>
-                            <option value="SERVER_RELAY">
-                                Relay: Sender ➝ Server ➝ Receiver
                             </option>
                         </select>
                     </div>

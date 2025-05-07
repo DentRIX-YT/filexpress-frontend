@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import "../styles/ReceiveFilePage.css"; // Styling specific to receive page
 import { startWebRTC, closeWebRTCConnection } from "../utilities/WebRTCService"; // WebRTC logic for receiving files
-import { validateHandshakeFromServer } from "../utilities/guardUtils";
+import { validateHandshakeFromServer } from "../utilities/GuardUtils";
 import { deletePrivateKey } from "../utilities/EncryptionUtilss";
 import TokenWrapper from "../utilities/TokenWrapper"; // Authentication wrapper
 import { useNavigate } from "react-router-dom";
@@ -51,12 +51,13 @@ const ReceiveFilePage = () => {
                         name: metadata.filename,
                         size: metadata.totalSize,
                         type: metadata.type || "application/octet-stream",
+                        method: metadata.method
                     });
                     setFileReady(true);
                 },
                 null, // לא צריך onChannelOpen
                 null, // לא צריך onTransferComplete
-                (percent) => setTransferProgress(percent) // ← כאן אתה מוסיף את זה
+                (percent) => setTransferProgress(percent) 
             );
         };
 
@@ -110,7 +111,7 @@ const ReceiveFilePage = () => {
                     senderUsername: senderUsername,
                     receiverUsername: receiverUsername,
                     filename: fileMetadata.name,
-                    method: "CLIENT_TO_CLIENT",
+                    method: fileMetadata.method,
                     storedForLater: fileMetadata.storedForLater || false,
                 }),
             });

@@ -359,7 +359,7 @@ const createAndSendOffer = async (peerUsername, username) => {
 
 // function to send a file over the DataChannel
 // This function encrypts the file using AES encryption
-export const sendFile = async (file, recipientPublicKeyPem, onProgress, transferMethod = "CLIENT_TO_CLIENT") => {
+export const sendFile = async (file, recipientPublicKeyPem, method = "CLIENT_TO_CLIENT", onProgress) => {
     if (!dataChannel || dataChannel.readyState !== "open") {
         console.error("DataChannel is not open yet.");
         return;
@@ -382,6 +382,7 @@ export const sendFile = async (file, recipientPublicKeyPem, onProgress, transfer
         encryptedAESKey: Array.from(new Uint8Array(encryptedAESKey)),
         totalSize: encrypted.byteLength,
         sha256: hashArray,
+        method: method
     };
     dataChannel.send(JSON.stringify({ type: "metadata", metadata }));
 

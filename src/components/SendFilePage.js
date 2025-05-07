@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import "../styles/SendFilePage.css"; // Styles specific to the SendFilePage component
 import { useLocation, useNavigate } from "react-router-dom";
-import { validateHandshakeFromServer } from "../utilities/guardUtils";
+import { validateHandshakeFromServer } from "../utilities/GuardUtils";
+import { sendFileViaWebSocket } from "../utilities/WebSocketFileService";
 import {
     startWebRTC,
     sendFile,
@@ -24,7 +25,23 @@ const SendFilePage = () => {
     const [isDataChannelOpen, setIsDataChannelOpen] = useState(false); // Tracks DataChannel readiness
     const [transferProgress, setTransferProgress] = useState(0); // File transfer progress (0–100%)
     const [isTransferring, setIsTransferring] = useState(false); // Indicates ongoing transfer
+    const [webrtcDone, setWebrtcDone] = useState(false);
+    const [wsDone, setWsDone] = useState(false);
     const [transferMethod, setTransferMethod] = useState("CLIENT_TO_CLIENT");
+
+    useEffect(() => {
+        if ((transferMethod === "SERVER_RELAY" ? wsDone
+             : transferMethod === "CLIENT_TO_CLIENT" ? webrtcDone
+             : webrtcDone && wsDone)
+        ) {
+          // שניהם (או האחד הרלוונטי) גמרו:
+          closeWebRTCConnection();
+          // notify backend לשחרור handshake
+          fetch(`http://localhost:8080/webrtc/disconnect?username=${senderUsername}`, {method:"DELETE"});
+          fetch(`http://localhost:8080/handshake/remove/${senderUsername}`,    {method:"DELETE"});
+          navigate("/home");
+        }
+      }, [webrtcDone, wsDone, transferMethod, senderUsername, navigate]);
 
     // Establish WebRTC connection on component mount
     useEffect(() => {
@@ -39,12 +56,12 @@ const SendFilePage = () => {
                 receiverUsername
             );
             if (!isValid) {
-                console.warn("🚫 Invalid or missing handshake. Redirecting.");
+                console.warn("Invalid or missing handshake. Redirecting.");
                 navigate("/HandshakePage");
                 return;
             }
 
-            console.log("📤 Sender is preparing connection to:", receiverUsername);
+            console.log("Sender is preparing connection to:", receiverUsername);
 
             // Notify backend to initiate WebRTC signaling
             fetch("http://localhost:8080/webrtc/start-webrtc", {
@@ -79,20 +96,22 @@ const SendFilePage = () => {
                         },
                         () => {
                             console.log("Transfer confirmed by receiver. Cleaning up...");
-                            closeWebRTCConnection();
-                            fetch(
-                                `http://localhost:8080/webrtc/disconnect?username=${senderUsername}`,
-                                {
-                                    method: "DELETE",
-                                }
-                            );
-                            fetch(
-                                `http://localhost:8080/handshake/remove/${senderUsername}`,
-                                {
-                                    method: "DELETE",
-                                }
-                            );
-                            navigate("/home");
+                            console.log("WebRTC transfer complete.");
+                            setWebrtcDone(true);
+                            // closeWebRTCConnection();
+                            // fetch(
+                            //     `http://localhost:8080/webrtc/disconnect?username=${senderUsername}`,
+                            //     {
+                            //         method: "DELETE",
+                            //     }
+                            // );
+                            // fetch(
+                            //     `http://localhost:8080/handshake/remove/${senderUsername}`,
+                            //     {
+                            //         method: "DELETE",
+                            //     }
+                            // );
+                            // navigate("/home");
                         }
                     );
                 })
@@ -119,23 +138,63 @@ const SendFilePage = () => {
             return;
         }
 
-        if (!isDataChannelOpen) {
+        if (transferMethod !== "SERVER_RELAY" && !isDataChannelOpen) {
             setStatusMessage("DataChannel is not ready yet. Please wait...");
             return;
         }
 
+        
+
         setStatusMessage("Sending file...");
+        setIsTransferring(true);
+        setTransferProgress(0);
         try {
-            setIsTransferring(true);
-            setTransferProgress(0);
-
             // Send file with progress callback
-            await sendFile(selectedFile, receiverPublicKey, (percent) => {
-                setTransferProgress(percent);
-            });
-
+            if(transferMethod === "CLIENT_TO_CLIENT") {
+                await sendFile(selectedFile, receiverPublicKey, "CLIENT_TO_CLIENT", (percent) => {
+                    setTransferProgress(percent);
+                });
+            }
+            else if(transferMethod === "CLIENT_TO_BOTH") {
+                await sendFile(selectedFile, receiverPublicKey, "CLIENT_TO_BOTH", (percent) => {
+                    setTransferProgress(percent / 2); 
+                });
+    
+                await sendFileViaWebSocket(
+                    selectedFile,
+                    senderUsername,
+                    receiverUsername,
+                    receiverPublicKey,
+                    (percent) => {
+                        setTransferProgress(50 + percent / 2);
+                    },
+                    () => {
+                        console.log("WebSocket upload complete.");
+                        setWsDone(true);
+                    }
+                );
+                
+            }
+            else if(transferMethod === "SERVER_RELAY") {
+                await sendFileViaWebSocket(
+                    selectedFile,
+                    senderUsername,
+                    receiverUsername,
+                    receiverPublicKey,
+                    (percent) => {
+                        setTransferProgress(percent);
+                    },
+                    () => {
+                        console.log("WebSocket upload complete.");
+                        setWsDone(true);
+                    }
+                );
+                
+            }
             setIsTransferring(false);
             setStatusMessage("File sent successfully!");
+
+
         } catch (error) {
             console.error("File transfer failed:", error);
             setStatusMessage("File transfer failed.");

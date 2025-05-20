@@ -16,7 +16,7 @@ const ViewOldFilePage = () => {
   const [showPassModal, setShowPassModal] = useState(false);
   const [selectedFileForDownload, setSelectedFileForDownload] = useState(null);
   const [downloadStatus, setDownloadStatus] = useState("");
-
+  const [downloadProgress, setDownloadProgress] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,11 +55,14 @@ const ViewOldFilePage = () => {
         }
       } else if (viewMode === "files") {
         try {
-          const response = await fetch(`http://localhost:8080/api/files/${username}`, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
+          const response = await fetch(
+            `http://localhost:8080/api/files/${username}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
 
           const rawText = await response.text();
           const files = JSON.parse(rawText);
@@ -82,6 +85,18 @@ const ViewOldFilePage = () => {
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const formatFileSize = (sizeInBytes) => {
+    if (sizeInBytes < 1024) {
+      return `${sizeInBytes} B`;
+    } else if (sizeInBytes < 1024 ** 2) {
+      return `${(sizeInBytes / 1024).toFixed(1)} KB`;
+    } else if (sizeInBytes < 1024 ** 3) {
+      return `${(sizeInBytes / 1024 ** 2).toFixed(1)} MB`;
+    } else {
+      return `${(sizeInBytes / 1024 ** 3).toFixed(2)} GB`;
+    }
   };
 
   const buttons = [
@@ -154,12 +169,26 @@ const ViewOldFilePage = () => {
           {viewMode === "files" && (
             <>
               <h2>Server-Saved Files</h2>
+
+              {downloadProgress !== null && (
+                <div className="progress-bar-wrapper">
+                  <div
+                    className="progress-bar"
+                    style={{ width: `${downloadProgress}%` }}
+                  />
+                  <p>Downloading: {downloadProgress}%</p>
+                </div>
+              )}
+
               <ul className="server-file-list">
                 {serverFiles.length === 0 && <p>No saved files found.</p>}
                 {serverFiles.map((file) => (
                   <li key={file.id} className="file-item">
-                    <strong>{file.originalFilename}</strong> – Size: {(file.size / (1024 ** 3)).toFixed(2)} GB – Uploaded at:{" "}
-                    <span className="upload-time">{formatDate(file.uploadedAt)}</span> &nbsp;
+                    <strong>{file.originalFilename}</strong> – Size: {formatFileSize(file.size)} – Uploaded at:{" "}
+                    <span className="upload-time">
+                      {formatDate(file.uploadedAt)}
+                    </span>{" "}
+                    &nbsp;
                     <button
                       onClick={() => {
                         setSelectedFileForDownload(file);
@@ -167,20 +196,26 @@ const ViewOldFilePage = () => {
                       }}
                     >
                       Download
-                    </button> &nbsp;
+                    </button>{" "}
+                    &nbsp;
                     <button
                       onClick={async () => {
                         const token = sessionStorage.getItem("accessToken");
                         try {
-                          const res = await fetch(`http://localhost:8080/api/files/delete/${file.id}`, {
-                            method: "DELETE",
-                            headers: {
-                              Authorization: `Bearer ${token}`,
-                            },
-                          });
+                          const res = await fetch(
+                            `http://localhost:8080/api/files/delete/${file.id}`,
+                            {
+                              method: "DELETE",
+                              headers: {
+                                Authorization: `Bearer ${token}`,
+                              },
+                            }
+                          );
 
                           if (res.ok) {
-                            setServerFiles((prev) => prev.filter((f) => f.id !== file.id));
+                            setServerFiles((prev) =>
+                              prev.filter((f) => f.id !== file.id)
+                            );
                           } else {
                             console.error("Failed to delete file.");
                           }
@@ -196,6 +231,7 @@ const ViewOldFilePage = () => {
               </ul>
             </>
           )}
+
           {downloadStatus && (
             <p className="download-status">{downloadStatus}</p>
           )}
@@ -207,12 +243,15 @@ const ViewOldFilePage = () => {
                   const accessToken = sessionStorage.getItem("accessToken");
                   const username = await fetchUsernameFromToken();
 
-                  const res = await fetch(`http://localhost:8080/api/private-key/${username}`, {
-                    method: "GET",
-                    headers: {
-                      Authorization: `Bearer ${accessToken}`,
-                    },
-                  });
+                  const res = await fetch(
+                    `http://localhost:8080/api/private-key/${username}`,
+                    {
+                      method: "GET",
+                      headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                      },
+                    }
+                  );
 
                   if (!res.ok) {
                     setError("Failed to retrieve encrypted private key.");
@@ -222,9 +261,14 @@ const ViewOldFilePage = () => {
                   const data = await res.json();
                   const encryptedKey = data.encryptedPrivateKey;
 
-                  const privateKey = await decryptAndCachePrivateKey(encryptedKey, passphrase);
+                  const privateKey = await decryptAndCachePrivateKey(
+                    encryptedKey,
+                    passphrase
+                  );
                   if (!privateKey) {
-                    setError("Failed to decrypt private key. Please check your passphrase.");
+                    setError(
+                      "Failed to decrypt private key. Please check your passphrase."
+                    );
                     return;
                   }
 
@@ -236,13 +280,21 @@ const ViewOldFilePage = () => {
                   await downloadEncryptedFileViaWebSocket(
                     selectedFileForDownload,
                     privateKey,
-                    (progress) => console.log("Download progress:", progress),
+                    (progress) => {
+                      setDownloadProgress(progress);
+                      if (progress === 100) {
+                        setTimeout(() => setDownloadProgress(null), 1500);
+                      }
+                    },
                     setDownloadStatus
                   );
 
                   setShowPassModal(false);
                 } catch (err) {
-                  console.error("Error during passphrase verification or file download:", err);
+                  console.error(
+                    "Error during passphrase verification or file download:",
+                    err
+                  );
                   setError("A network error occurred. Please try again.");
                 }
               }}

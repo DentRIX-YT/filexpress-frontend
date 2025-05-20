@@ -140,4 +140,22 @@
     padding: 5px 10px;
   }
   
+
+  .progress-bar-wrapper {
+    width: 100%;
+    max-width: 500px;
+    margin: 10px auto;
+    background-color: #e0e0e0;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    height: 24px;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.15);
+  }
+  
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(to right, #4caf50, #81c784);
+    transition: width 0.3s ease-in-out;
+  }
   

@@ -151,11 +151,11 @@ const initializePeerConnection = (role, peerUsername, username) => {
             const candidateType = typeMatch ? typeMatch[1] : "unknown";
 
             console.log(
-                `📡 ICE candidate: protocol=${protocol}, type=${candidateType}`
+                `ICE candidate: protocol=${protocol}, type=${candidateType}`
             );
-            console.log("📥 Full candidate string:", candidateStr);
+            console.log("Full candidate string:", candidateStr);
         } else {
-            console.log("✅ All ICE candidates have been sent.");
+            console.log("All ICE candidates have been sent.");
         }
     };
 
@@ -182,8 +182,8 @@ const initializePeerConnection = (role, peerUsername, username) => {
                 try {
                     const parsed = JSON.parse(event.data);
                     if (parsed.type === "transfer-complete") {
-                        console.log("✅ Transfer confirmed by receiver.");
-                        onTransferCompleteCallback(); // ← קריאה ל-callback
+                        console.log("Transfer confirmed by receiver.");
+                        onTransferCompleteCallback(); // call to callback
                     }
                 } catch (e) {
                     console.error("Invalid message format:", event.data);

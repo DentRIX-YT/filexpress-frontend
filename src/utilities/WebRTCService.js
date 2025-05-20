@@ -20,8 +20,14 @@ let onDataReceivedCallback = () => { };
 let onTransferCompleteCallback = () => { };
 let onProgressReceiverCallback = () => {};
 let isStompConnected = false; // Track STOMP connection status
-let receivedChunks = [];
+
+let receivedChunks = [];     // collected chunks (will be used as a map)
 let receivedMetadata = null;
+
+// reliability variables
+let outgoingChunks = [];
+let expectedChunks = 0;
+let receivedCount = 0;
 
 // Function to start WebRTC connection
 export const startWebRTC = (
@@ -184,6 +190,12 @@ const initializePeerConnection = (role, peerUsername, username) => {
                     if (parsed.type === "transfer-complete") {
                         console.log("Transfer confirmed by receiver.");
                         onTransferCompleteCallback(); // call to callback
+                    } else if (parsed.type === "nack" && Array.isArray(parsed.missing)) {
+                        // handle negative acknowledgement and resend missing chunks
+                        parsed.missing.forEach(seq => {
+                            const chunkData = outgoingChunks[seq];
+                            if (chunkData) dataChannel.send(chunkData);
+                        });
                     }
                 } catch (e) {
                     console.error("Invalid message format:", event.data);
@@ -191,9 +203,9 @@ const initializePeerConnection = (role, peerUsername, username) => {
             }
         };
         
-
         createAndSendOffer(peerUsername, username);
-        //if the role is receiver, wait for the data channel to be created
+
+    //if the role is receiver, wait for the data channel to be created
     } else if (role === "receiver") {
         console.log("Receiver: Waiting for DataChannel...");
         peerConnection.ondatachannel = (event) => {
@@ -209,32 +221,52 @@ const initializePeerConnection = (role, peerUsername, username) => {
                     const parsed = JSON.parse(event.data);
                     if (parsed.type === "metadata") {
                         receivedMetadata = parsed.metadata;
-                        receivedChunks = [];
+                        receivedChunks = [];  
                         console.log("Received metadata:", receivedMetadata);
+                        // initialize reliability variables
+                        expectedChunks = receivedMetadata.totalChunks;
+                        receivedCount = 0;
+                        receivedChunks = {};
                     }
                 } else {
                     // Handle binary data (file chunks)
                     console.log("Receiver: Received DataChunk!");
-                    receivedChunks.push(event.data);
+                    const buffer = await event.data.arrayBuffer();
+                    const view = new DataView(buffer);
+                    const seq = view.getUint32(0, true);  // sequence number from header
+                    const payload = buffer.slice(4);
 
-                    // מחשב גודל כולל שהתקבל
-                    const receivedSize = receivedChunks.reduce(
-                        (acc, chunk) => acc + chunk.size,
-                        0
-                    );
-                    
-                    // עדכון progress
-                    if (receivedMetadata && onProgressReceiverCallback) {
-                        const percent = Math.floor((receivedSize / receivedMetadata.totalSize) * 100);
-                        onProgressReceiverCallback(percent);
+                    // store chunk if not received before
+                    if (!receivedChunks[seq]) {
+                        receivedChunks[seq] = payload;
+                        receivedCount++;
+                        // עדכון progress
+                        if (receivedMetadata && onProgressReceiverCallback) {
+                            const percent = Math.floor((receivedCount / expectedChunks) * 100);
+                            onProgressReceiverCallback(percent);
+                        }
                     }
-                    
-                    if (receivedMetadata && receivedSize >= receivedMetadata.totalSize) {
-                        const encryptedBlob = new Blob(receivedChunks);
-                        const arrayBuffer = await encryptedBlob.arrayBuffer();
+
+                    if (receivedMetadata && receivedCount === expectedChunks) {
+                        // check for missing chunks
+                        const missing = [];
+                        for (let i = 0; i < expectedChunks; i++) {
+                            if (!receivedChunks[i]) missing.push(i);
+                        }
+                        if (missing.length) {
+                            dataChannel.send(JSON.stringify({ type: "nack", missing }));
+                            return;
+                        }
+
+                        // assemble chunks in order
+                        const ordered = [];
+                        for (let i = 0; i < expectedChunks; i++) {
+                            ordered.push(new Uint8Array(receivedChunks[i]));
+                        }
+                        const encryptedBlob = new Blob(ordered);
+                        const arrayBufferFull = await encryptedBlob.arrayBuffer();
 
                         const privateKeyPem = window.sessionPrivateKey;
-
 
                         // Check if privateKeyPem is null
                         if (!privateKeyPem) {
@@ -265,7 +297,7 @@ const initializePeerConnection = (role, peerUsername, username) => {
                         // and compare it with the hash in the metadata
                         const receivedHashBuffer = await crypto.subtle.digest(
                             "SHA-256",
-                            arrayBuffer
+                            arrayBufferFull
                         );
                         const receivedHashArray = Array.from(
                             new Uint8Array(receivedHashBuffer)
@@ -282,7 +314,7 @@ const initializePeerConnection = (role, peerUsername, username) => {
                         }
 
                         const decryptedBuffer = await decryptFile(
-                            arrayBuffer,
+                            arrayBufferFull,
                             aesKeyBytes,
                             new Uint8Array(receivedMetadata.iv)
                         );
@@ -376,34 +408,40 @@ export const sendFile = async (file, recipientPublicKeyPem, method = "CLIENT_TO_
     const hashBuffer = await crypto.subtle.digest("SHA-256", encrypted);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
 
+    const encryptedUint8 = new Uint8Array(encrypted);
+    const totalSize = encryptedUint8.byteLength;
+    const chunkSize = 16384;
+    // חישוב דינמי כמה צ'אנקים לדלג בין עדכונים, מ־50 עד 500 צ'אנקים
+    const totalChunks = Math.ceil(totalSize / chunkSize);
+    const updateFrequency = Math.max(50, Math.floor(totalChunks / 100));
+
     const metadata = {
         filename: file.name,
         iv: Array.from(iv),
         encryptedAESKey: Array.from(new Uint8Array(encryptedAESKey)),
-        totalSize: encrypted.byteLength,
+        totalSize: totalSize,
+        totalChunks: totalChunks,
         sha256: hashArray,
         method: method
     };
     dataChannel.send(JSON.stringify({ type: "metadata", metadata }));
 
-    const encryptedUint8 = new Uint8Array(encrypted);
-    const totalSize = encryptedUint8.byteLength;
-    const chunkSize = 16384;
-    let offset = 0;
-    let chunkCounter = 0;
+    outgoingChunks = [];
+    for (let seq = 0; seq < totalChunks; seq++) {
+        const start = seq * chunkSize;
+        const chunk = encryptedUint8.slice(start, start + chunkSize);
 
-    // חישוב דינמי כמה צ'אנקים לדלג בין עדכונים, מ־50 עד 500 צ'אנקים
-    const totalChunks = Math.ceil(totalSize / chunkSize);
-    const updateFrequency = Math.max(50, Math.floor(totalChunks / 100));
+        // prepend 4-byte sequence number header
+        const header = new Uint32Array([seq]).buffer;
+        const combined = new Uint8Array(header.byteLength + chunk.byteLength);
+        combined.set(new Uint8Array(header), 0);
+        combined.set(chunk, header.byteLength);
 
-    while (offset < totalSize) {
-        const chunk = encryptedUint8.slice(offset, offset + chunkSize);
-        dataChannel.send(chunk);
-        offset += chunkSize;
-        chunkCounter++;
+        outgoingChunks.push(combined);
+        dataChannel.send(combined);
 
-        if (onProgress && chunkCounter % updateFrequency === 0) {
-            const percent = Math.floor((offset / totalSize) * 100);
+        if (onProgress && seq % updateFrequency === 0) {
+            const percent = Math.floor(((seq + 1) / totalChunks) * 100);
             onProgress(percent);
             await new Promise((resolve) => setTimeout(resolve, 0));
         }
@@ -412,8 +450,6 @@ export const sendFile = async (file, recipientPublicKeyPem, method = "CLIENT_TO_
     if (onProgress) onProgress(100);
     console.log("File sent successfully.");
 };
-
-
 
 export const closeWebRTCConnection = () => {
     try {

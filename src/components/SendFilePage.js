@@ -35,8 +35,8 @@ const SendFilePage = () => {
 
         if ((isClientToClient && webrtcDone) || (isClientToBoth && webrtcDone && wsDone)) {
             closeWebRTCConnection();
-            fetch(`http://localhost:8080/webrtc/disconnect?username=${senderUsername}`, { method: "DELETE" });
-            fetch(`http://localhost:8080/handshake/remove/${senderUsername}`, { method: "DELETE" });
+            fetch(`http://localhost:8080/webrtc/disconnect?username=${senderUsername}`, { method: "DELETE", headers: { Authorization: `Bearer ${sessionStorage.getItem("accessToken")}` } });
+            fetch(`http://localhost:8080/handshake/remove/${senderUsername}`, { method: "DELETE", headers: { Authorization: `Bearer ${sessionStorage.getItem("accessToken")}` } });
             navigate("/home");
         }
     }, [webrtcDone, wsDone, transferMethod, senderUsername, navigate]);
@@ -64,7 +64,7 @@ const SendFilePage = () => {
             // Notify backend to initiate WebRTC signaling
             fetch("http://localhost:8080/webrtc/start-webrtc", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionStorage.getItem("accessToken")}` },
                 body: JSON.stringify({
                     sender: senderUsername,
                     receiver: receiverUsername,

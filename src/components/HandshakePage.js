@@ -70,17 +70,20 @@ const HandshakePage = () => {
     setRole("sender");
     const newHandshakeCode = generateHandshakeCode();
     setHandshakeCode(newHandshakeCode);
-  
+
     try {
       const response = await fetch("http://localhost:8080/handshake/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           senderUsername: username,
           handshakeCode: newHandshakeCode,
         }),
       });
-  
+
       const data = await response.json();
       if (data.handshakeCode === newHandshakeCode) {
         setAnimationClass("fade-in");
@@ -88,7 +91,13 @@ const HandshakePage = () => {
         // Polling backend every 3 seconds for handshake completion status
         const intervalId = setInterval(async () => {
           const statusResponse = await fetch(
-            `http://localhost:8080/handshake/status/${username}`
+            `http://localhost:8080/handshake/status/${username}`, {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${sessionStorage.getItem("accessToken")}`,
+              "Content-Type": "application/json"
+            }
+          }
           );
           const statusData = await statusResponse.json();
 
@@ -135,7 +144,10 @@ const HandshakePage = () => {
     try {
       const response = await fetch("http://localhost:8080/handshake/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           receiverUsername: username,
           providedHandshakeCode: receiverCode,

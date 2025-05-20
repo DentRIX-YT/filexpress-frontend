@@ -29,7 +29,9 @@ const LoginPage = () => {
     try {
       const response = await fetch("http://localhost:8080/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           username: loginUsername,
           password: loginPassword,
@@ -76,7 +78,7 @@ const LoginPage = () => {
 
       const response = await fetch("http://localhost:8080/users", {
         method: "POST",
-        headers: {
+        headers: { 
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),
@@ -198,7 +200,10 @@ const LoginPage = () => {
       // Upload public key to server
       await fetch("http://localhost:8080/api/public-key", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           username: loginUsername,
           publicKeyValue: publicKeyBase64,
@@ -208,7 +213,10 @@ const LoginPage = () => {
       // Upload encrypted private key to server
       await fetch("http://localhost:8080/api/private-key", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           username: loginUsername,
           encryptedPrivateKey: encryptedKey,

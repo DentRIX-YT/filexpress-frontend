@@ -1,7 +1,13 @@
 export const validateHandshakeFromServer = async (senderUsername, receiverUsername) => {
     try {
         const response = await fetch(
-            `http://localhost:8080/handshake/is-valid?senderUsername=${senderUsername}&receiverUsername=${receiverUsername}`
+            `http://localhost:8080/handshake/is-valid?senderUsername=${senderUsername}&receiverUsername=${receiverUsername}`,
+            {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${sessionStorage.getItem("accessToken")}`
+                }
+            }
         );
 
         if (!response.ok) return false;

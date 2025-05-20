@@ -80,10 +80,16 @@ const ReceiveFilePage = () => {
             closeWebRTCConnection();
             await deletePrivateKey();
             fetch(`http://localhost:8080/webrtc/disconnect?username=${receiverUsername}`, {
-                method: "DELETE"
+                method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`
+                },
             });
             fetch(`http://localhost:8080/handshake/remove/${senderUsername}`, {
                 method: "DELETE",
+                headers: {
+                    Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`
+                },
             });     
             navigate("/home"); // Redirect to home after saving
         } catch (err) {
@@ -130,8 +136,12 @@ const ReceiveFilePage = () => {
     const handleCancel = async () => {
         closeWebRTCConnection();
         await deletePrivateKey();
-        await fetch(`http://localhost:8080/webrtc/disconnect?username=${receiverUsername}`, { method: "DELETE" });
-        await fetch(`http://localhost:8080/handshake/remove/${senderUsername}`, { method: "DELETE" });
+        await fetch(`http://localhost:8080/webrtc/disconnect?username=${receiverUsername}`, { method: "DELETE", headers: {
+                    Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`
+                }, });
+        await fetch(`http://localhost:8080/handshake/remove/${senderUsername}`, { method: "DELETE", headers: {
+                    Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`
+                }, });
         navigate("/home");
       };
 
